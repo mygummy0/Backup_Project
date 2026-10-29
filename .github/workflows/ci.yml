@@ -1,0 +1,51 @@
+name: ci
+on: [push, pull_request]
+jobs:
+  e2e:
+    name: ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    # Windows runs the bash e2e suite through Git Bash; it has not been verified locally yet.
+    continue-on-error: ${{ matrix.os == 'windows-latest' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with: { go-version: "1.22" }
+      - name: Go
+        run: |
+          cd go && gofmt -l . | (! grep .) && go vet ./... && go build -o ../bin/backup-go .
+          cd .. && tests/e2e.sh "$(ls bin/backup-go*)"
+      - name: Rust
+        run: |
+          cd rust && cargo clippy --release -- -D warnings && cargo build --release
+          cd .. && tests/e2e.sh "$(ls rust/target/release/backup rust/target/release/backup.exe 2>/dev/null | head -1)"
+      - name: C++
+        run: |
+          cmake -S cpp -B cpp/build && cmake --build cpp/build --config Release
+          BIN=$(find cpp/build -type f \( -name backup -o -name backup.exe \) | head -1)
+          tests/e2e.sh "$BIN"
+
+  unit:
+    name: unit + gui
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "22" }
+      - name: Python tests (design tokens, GUI design guard, backup core)
+        run: python -m unittest discover tests
+      - name: Rust engine tests
+        run: cd rust && cargo test --release
+      - name: GUI frontend build
+        run: cd gui-tauri && npm ci && npm run build
+      - name: Tauri backend compiles
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev librsvg2-dev libsoup-3.0-dev libjavascriptcoregtk-4.1-dev patchelf
+          cargo check --manifest-path gui-tauri/src-tauri/Cargo.toml

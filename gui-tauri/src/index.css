@@ -1,0 +1,111 @@
+@import "pretendard/dist/web/variable/pretendardvariable-dynamic-subset.css";
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "./tokens.css";
+
+/* Server Mono: 단일 굵기(Regular). 한글 글리프가 없어서 Pretendard가 이어받는다. */
+@font-face {
+  font-family: "ServerMono";
+  src: url("./fonts/ServerMono-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-active: var(--primary-active);
+  --color-pressed: var(--pressed);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --radius-lg: var(--radius-control);
+  --radius-xl: var(--radius-card);
+  --font-sans: var(--font-sans);
+  --ease-out: var(--ease-out);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+  body {
+    @apply bg-background font-sans text-sm text-foreground antialiased;
+    font-weight: 400;
+    font-synthesis: none; /* 단일 굵기 서체: 가짜 굵기/기울임을 만들지 않는다 */
+    letter-spacing: var(--letter-spacing);
+    line-height: var(--line-height);
+  }
+  h1,
+  h2 {
+    font-weight: 400;
+  }
+  /* 모든 전환: duration-300 + cubic-bezier(0.16, 1, 0.3, 1) */
+  button,
+  input,
+  textarea,
+  [role="combobox"],
+  [role="switch"] {
+    transition-duration: var(--duration);
+    transition-timing-function: var(--ease-out);
+  }
+}
+
+:root {
+  --tw-animation-duration: var(--duration);
+}
+
+@keyframes busy-slide {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(250%);
+  }
+}
+
+/* 진행 표시: 움직임을 줄이는 설정이면 정지 */
+.busy-slide {
+  animation: busy-slide 1200ms var(--ease-out) infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .busy-slide {
+    animation: none;
+    transform: none;
+  }
+}
+
+/* 움직임 줄이기 설정이면 전환·애니메이션을 사실상 끈다 */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
