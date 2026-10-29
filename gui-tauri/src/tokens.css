@@ -1,0 +1,61 @@
+/* GENERATED from design_tokens.py by gui-tauri/scripts/gen_tokens.py - do not edit. */
+:root {
+  --background: #F8FAFC;
+  --foreground: #0F172A;
+  --card: #FFFFFF;
+  --card-foreground: #0F172A;
+  --popover: #FFFFFF;
+  --popover-foreground: #0F172A;
+  --primary: #4F46E5;
+  --primary-foreground: #FFFFFF;
+  --primary-hover: #4338CA;
+  --primary-active: #3730A3;
+  --pressed: #E2E8F0;
+  --secondary: #F8FAFC;
+  --secondary-foreground: #0F172A;
+  --muted: #F8FAFC;
+  --muted-foreground: #64748B;
+  --accent: #EEF2FF;
+  --accent-foreground: #0F172A;
+  --destructive: #BE123C;
+  --border: #E2E8F0;
+  --input: #E2E8F0;
+  --ring: #4F46E5;
+  --success: #047857;
+  --warning: #B45309;
+}
+
+.dark {
+  --background: #020617;
+  --foreground: #E2E8F0;
+  --card: #0F172A;
+  --card-foreground: #E2E8F0;
+  --popover: #0F172A;
+  --popover-foreground: #E2E8F0;
+  --primary: #4F46E5;
+  --primary-foreground: #FFFFFF;
+  --primary-hover: #4338CA;
+  --primary-active: #3730A3;
+  --pressed: #334155;
+  --secondary: #1E293B;
+  --secondary-foreground: #E2E8F0;
+  --muted: #020617;
+  --muted-foreground: #94A3B8;
+  --accent: #1E293B;
+  --accent-foreground: #E2E8F0;
+  --destructive: #FB7185;
+  --border: #334155;
+  --input: #334155;
+  --ring: #818CF8;
+  --success: #34D399;
+  --warning: #FBBF24;
+}
+
+:root {
+  --radius-card: 12px;
+  --radius-control: 8px;
+  --control-height: 40px;
+  --duration: 200ms;
+  --ease-out: cubic-bezier(0.16, 1.0, 0.3, 1.0);
+  --font-sans: Pretendard, "Malgun Gothic", "Apple SD Gothic Neo", "Noto Sans CJK KR", "Noto Sans KR", NanumGothic, Inter, system-ui, sans-serif;
+}

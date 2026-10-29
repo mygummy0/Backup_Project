@@ -1,0 +1,78 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "./tokens.css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-active: var(--primary-active);
+  --color-pressed: var(--pressed);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --radius-lg: var(--radius-control);
+  --radius-xl: var(--radius-card);
+  --font-sans: var(--font-sans);
+  --ease-out: var(--ease-out);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+  body {
+    @apply bg-background font-sans text-sm leading-6 text-foreground antialiased;
+  }
+  /* 모든 전환: duration-200 + cubic-bezier(0.16, 1, 0.3, 1) */
+  button,
+  input,
+  textarea,
+  [role="combobox"],
+  [role="switch"] {
+    transition-duration: var(--duration);
+    transition-timing-function: var(--ease-out);
+  }
+}
+
+@keyframes busy-slide {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(250%);
+  }
+}
+
+/* 진행 표시: 움직임을 줄이는 설정이면 정지 */
+.busy-slide {
+  animation: busy-slide 1200ms var(--ease-out) infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .busy-slide {
+    animation: none;
+    transform: none;
+  }
+}
