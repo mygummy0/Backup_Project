@@ -3,6 +3,14 @@ name = "backup"
 version = "0.1.0"
 edition = "2021"
 
+[lib]
+name = "backup"
+path = "src/lib.rs"
+
+[[bin]]
+name = "backup"
+path = "src/main.rs"
+
 [dependencies]
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
 ctrlc = { version = "3", features = ["termination"] }
