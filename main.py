@@ -211,19 +211,11 @@ class ModernBackupApp(ctk.CTk):
         self.grid_rowconfigure(3, weight=1)
         pad, gap = SP["6"], SP["4"]
 
-        # 헤더: 제목 + 상태
+        # 헤더
         header = ctk.CTkFrame(self, fg_color="transparent")
         header.grid(row=0, column=0, sticky="ew", padx=pad, pady=(pad, gap))
         header.grid_columnconfigure(0, weight=1)
         self.label(header, "자동 백업", "h1").grid(row=0, column=0, sticky="w")
-        status = ctk.CTkFrame(header, fg_color="transparent")
-        status.grid(row=0, column=1, sticky="e")
-        self.status_dot = ctk.CTkFrame(status, width=SP["2"], height=SP["2"], corner_radius=SP["1"],
-                                       fg_color=C["slate_500"])
-        self.status_dot.pack(side="left", padx=(0, SP["2"]))
-        self.status_label = self.label(status, "", "caption", "slate_500")
-        self.status_label.pack(side="left")
-        self.status_dot.pack_forget()  # 중지 상태에서는 아무것도 표시하지 않는다
 
         # 설정 카드
         form = self.card(1, pady=(0, gap))
@@ -318,15 +310,6 @@ class ModernBackupApp(ctk.CTk):
                        self.option_interval, self.option_keep):
             widget.set_enabled(enabled)
 
-    def set_status(self, text, dot=None):
-        """text가 비어 있으면 상태 표시 전체를 숨긴다."""
-        self.status_label.configure(text=text)
-        if text:
-            self.status_dot.configure(fg_color=C[dot])
-            self.status_dot.pack(side="left", padx=(0, SP["2"]), before=self.status_label)
-        else:
-            self.status_dot.pack_forget()
-
     def show_error(self, message):
         self.error_label.configure(text=message)
 
@@ -397,7 +380,6 @@ class ModernBackupApp(ctk.CTk):
         self.timer_label.configure(text_color=C["slate_900"])
 
         interval_str = self.option_interval.get()
-        self.set_status(f"{interval_str}마다 백업 중", "emerald_600")
         self.log(f"자동 백업 시작됨 (주기: {interval_str})")
 
         self.run_backup_process()
@@ -427,7 +409,6 @@ class ModernBackupApp(ctk.CTk):
 
         self.btn_toggle.set_variant("primary", "시작")
         self.timer_label.configure(text="--:--", text_color=C["slate_500"])
-        self.set_status("")
         self.log("자동 백업이 사용자에 의해 중지되었습니다.")
 
     def schedule_next(self):
