@@ -1,0 +1,224 @@
+<!doctype html>
+<!-- 자동 백업 — macOS HIG 블루프린트. 단일 파일, 복사해서 바로 열 수 있다 (Tailwind v4 CDN).
+     글꼴은 앱과 동일: Server Mono(숫자·경로·시간) + Pretendard(한글). 저장 위치: gui-tauri/design/macos-blueprint.html -->
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>백업</title>
+
+  <!-- Pretendard (한글) / Server Mono (라틴·숫자, SIL OFL) -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css" />
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+
+  <style type="text/tailwindcss">
+    @theme inline {
+      --font-sans: ServerMono, "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, sans-serif;
+      --color-win: var(--win);
+      --color-ink: var(--ink);
+      --color-ink-2: var(--ink-2);
+      --color-line: var(--line);
+      --color-fill: var(--fill);
+      --color-fill-2: var(--fill-2);
+      --color-accent: var(--accent);
+      --color-on-accent: var(--on-accent);
+      --color-ok: var(--ok);
+    }
+  </style>
+
+  <style>
+    @font-face {
+      font-family: "ServerMono";
+      src: url("https://cdn.jsdelivr.net/gh/internet-development/www-server-mono@main/public/fonts/ServerMono-Regular.woff2") format("woff2");
+      font-weight: 400;
+      font-display: swap;
+    }
+
+    /* ── 토큰: 라이트 / 다크 (콘텐츠가 주인공: 크롬은 거의 투명, 포인트 색은 5% 미만) ── */
+    :root {
+      --win: #ffffff;
+      --pane: rgba(246, 247, 249, 0.72);          /* 사이드바 틴트 (바이브런시) */
+      --ink: #0f172a;
+      --ink-2: #475569;                            /* 사이드바(블러 위)에서도 AA 유지 */
+      --line: rgba(15, 23, 42, 0.08);              /* 패널 분할선 */
+      --fill: rgba(15, 23, 42, 0.04);
+      --fill-2: rgba(15, 23, 42, 0.08);
+      --accent: #0f172a;
+      --on-accent: #ffffff;
+      --ok: #047857;
+      --focus: #0a84ff;
+      --shadow-window: 0 0 0 0.5px rgba(0, 0, 0, 0.3), 0 22px 70px 4px rgba(0, 0, 0, 0.28), 0 8px 24px rgba(0, 0, 0, 0.16);
+      --wall: radial-gradient(1100px 640px at 18% 8%, #e6e1d8 0%, transparent 60%),
+              radial-gradient(900px 600px at 90% 100%, #cfd3d8 0%, transparent 55%), #c7cbd1;
+
+      /* 모션: 스프링(linear()) + 미지원 브라우저용 cubic-bezier */
+      --spring: cubic-bezier(0.32, 0.72, 0, 1);
+      --press: cubic-bezier(0.34, 1.3, 0.64, 1);
+      --hover: cubic-bezier(0.25, 0.1, 0.25, 1);
+    }
+    @supports (transition-timing-function: linear(0, 1)) {
+      :root {
+        /* k=420 c=30 (ζ≈0.73): 오버슈트 3.4% — 사이드바·토글 */
+        --spring: linear(0, 0.1016, 0.312, 0.5357, 0.7252, 0.8644, 0.9547, 1.0055, 1.0285, 1.0342, 1.0307, 1.0235, 1.0159, 1.0094, 1.0046, 1.0015, 0.9998, 0.999, 0.9988, 0.9989, 0.9992, 0.9995, 0.9997, 0.9998, 0.9999);
+        /* k=520 c=22 (ζ≈0.48): 눌렀다 뗄 때의 쫀득한 복원 */
+        --press: linear(0, 0.1329, 0.4205, 0.7275, 0.9709, 1.1184, 1.1747, 1.1647, 1.1188, 1.0635, 1.0161, 0.9848, 0.9705, 0.9694, 0.9762, 0.9859, 0.995, 1.0014, 1.0048, 1.0056, 1.0047, 1.003, 1.0013, 1, 0.9993);
+      }
+    }
+    [data-theme="dark"] {
+      --win: #0b1220;
+      --pane: rgba(17, 24, 39, 0.55);
+      --ink: #e2e8f0;
+      --ink-2: #94a3b8;
+      --line: rgba(255, 255, 255, 0.08);
+      --fill: rgba(255, 255, 255, 0.05);
+      --fill-2: rgba(255, 255, 255, 0.09);
+      --accent: #f8fafc;
+      --on-accent: #0f172a;
+      --ok: #34d399;
+      --shadow-window: 0 0 0 0.5px rgba(255, 255, 255, 0.14), 0 22px 70px 4px rgba(0, 0, 0, 0.6), 0 8px 24px rgba(0, 0, 0, 0.4);
+      --wall: radial-gradient(1000px 600px at 15% 5%, #1b2230 0%, transparent 60%), #090d15;
+    }
+
+    html { color-scheme: light dark; }
+    body { background: var(--wall); font-synthesis: none; letter-spacing: -0.02em; }
+
+    /* ── 스쿼클: Figma 코너 스무딩 60% ≈ corner-shape: squircle (반경은 시각 보정 ×1.6) ── */
+    .sq { border-radius: var(--r); }
+    @supports (corner-shape: squircle) {
+      .sq { corner-shape: squircle; border-radius: calc(var(--r) * 1.6); }
+    }
+
+    /* ── 창 / 사이드바 접기 ── */
+    .win { display: grid; grid-template-columns: 240px 1fr; transition: grid-template-columns 0.6s var(--spring); }
+    .win[data-collapsed="true"] { grid-template-columns: 0px 1fr; }
+    .win[data-collapsed="true"] aside { border-right-width: 0; }      /* 접힌 뒤 남는 1px 선 제거 */
+    .toolbar { transition: padding-left 0.6s var(--spring); }
+    .win[data-collapsed="true"] .toolbar { padding-left: 88px; }   /* 신호등 자리 */
+
+    /* ── 인터랙션: 호버는 부드럽게, 누르면 0.97로 눌렸다가 스프링으로 복원 ── */
+    .press { transition: transform 0.6s var(--press), background-color 0.15s var(--hover); }
+    .press:active, .btn-primary:active { transform: scale(0.97); transition-duration: 0.08s, 0.15s; }
+    .press:hover { background-color: var(--fill-2); }
+    .btn-primary:hover { background-color: var(--accent); opacity: 0.88; }
+    .btn-primary { transition: transform 0.6s var(--press), opacity 0.15s var(--hover); }
+    .side-item[aria-current="page"] { background-color: var(--fill-2); }
+    :focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }   /* 키보드 이동에만 */
+    @keyframes rise { from { opacity: 0; transform: translateY(4px); } }
+    .log-row { animation: rise 0.45s cubic-bezier(0.32, 0.72, 0, 1); }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+    }
+  </style>
+</head>
+
+<body class="grid min-h-screen place-items-center p-8 font-sans text-[13px] leading-5 text-ink antialiased">
+  <main id="win" data-collapsed="false"
+        class="win sq relative h-[640px] max-h-[calc(100vh-4rem)] w-[960px] max-w-full overflow-hidden [--r:16px]"
+        style="box-shadow: var(--shadow-window)">
+
+    <!-- 신호등: 평소엔 회색, 창에 올리면 색이 켜진다 (프레임은 보이지 않게) -->
+    <div class="group absolute top-[18px] left-5 z-20 flex gap-2" aria-hidden="true">
+      <span class="size-3 rounded-full bg-fill-2 transition-colors duration-150 group-hover:bg-[#ff5f57]"></span>
+      <span class="size-3 rounded-full bg-fill-2 transition-colors duration-150 group-hover:bg-[#febc2e]"></span>
+      <span class="size-3 rounded-full bg-fill-2 transition-colors duration-150 group-hover:bg-[#28c840]"></span>
+    </div>
+
+    <!-- 사이드바 240px: backdrop-filter blur(30px) 바이브런시 -->
+    <aside class="min-w-0 overflow-hidden border-r-[0.5px] border-line"
+           style="background: var(--pane); backdrop-filter: blur(30px) saturate(1.6); -webkit-backdrop-filter: blur(30px) saturate(1.6)">
+      <nav aria-label="백업 목록" class="flex h-full w-60 flex-col px-3 pt-14 pb-3">
+        <p class="px-3 pb-2 text-[11px] leading-4 text-ink-2">백업</p>
+        <ul class="flex flex-col gap-0.5">
+          <li><button class="side-item press sq flex h-8 w-full items-center gap-2 px-3 text-left [--r:10px]" aria-current="page">
+            <svg class="size-4 shrink-0" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" aria-hidden="true"><path d="M2 4.5A1.5 1.5 0 0 1 3.5 3h2.6l1.4 1.5h5A1.5 1.5 0 0 1 14 6v5.5a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 2 11.5z"/></svg>
+            <span class="flex-1">프로젝트</span><span class="size-1.5 rounded-full bg-ok" title="정상"></span></button></li>
+          <li><button class="side-item press sq flex h-8 w-full items-center gap-2 px-3 text-left [--r:10px]">
+            <svg class="size-4 shrink-0" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" aria-hidden="true"><path d="M2 4.5A1.5 1.5 0 0 1 3.5 3h2.6l1.4 1.5h5A1.5 1.5 0 0 1 14 6v5.5a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 2 11.5z"/></svg>
+            <span class="flex-1">문서</span><span class="size-1.5 rounded-full bg-ok" title="정상"></span></button></li>
+          <li><button class="side-item press sq flex h-8 w-full items-center gap-2 px-3 text-left [--r:10px]">
+            <svg class="size-4 shrink-0" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" aria-hidden="true"><path d="M2 4.5A1.5 1.5 0 0 1 3.5 3h2.6l1.4 1.5h5A1.5 1.5 0 0 1 14 6v5.5a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 2 11.5z"/></svg>
+            <span class="flex-1">사진</span><span class="size-1.5 rounded-full bg-ink-2/50" title="대기"></span></button></li>
+        </ul>
+        <button class="press sq mt-auto flex h-8 items-center gap-2 px-3 text-left [--r:10px]" aria-keyshortcuts="Meta+Comma">
+          <svg class="size-4 shrink-0" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="8" cy="8" r="2"/><path d="M8 1.8v1.6M8 12.6v1.6M1.8 8h1.6M12.6 8h1.6M3.6 3.6l1.1 1.1M11.3 11.3l1.1 1.1M3.6 12.4l1.1-1.1M11.3 4.7l1.1-1.1"/></svg>
+          <span class="flex-1">설정</span><kbd class="text-[11px] text-ink-2">⌘,</kbd></button>
+      </nav>
+    </aside>
+
+    <!-- 메인: 콘텐츠가 주인공 -->
+    <section class="flex min-w-0 flex-col bg-win">
+      <header class="toolbar flex h-14 items-center gap-3 border-b-[0.5px] border-line px-4" data-tauri-drag-region>
+        <button id="toggle" class="press sq grid size-8 place-items-center text-ink-2 [--r:10px]" aria-label="사이드바 접기" aria-keyshortcuts="Meta+B">
+          <svg class="size-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="3" width="12" height="10" rx="2.5"/><path d="M6 3v10"/></svg></button>
+        <h1 class="text-[13px] leading-4 font-semibold">프로젝트</h1>
+        <button id="run" class="btn-primary sq ml-auto h-8 min-w-[72px] bg-accent px-4 text-on-accent [--r:10px]">시작</button>
+      </header>
+
+      <div class="flex flex-1 flex-col gap-8 overflow-auto px-8 py-8">
+        <div class="flex flex-col gap-4">
+          <label class="flex flex-col gap-2"><span class="text-[11px] leading-4 text-ink-2">원본</span>
+            <span class="flex gap-2"><input readonly value="~/Projects" class="sq h-8 min-w-0 flex-1 border-[0.5px] border-line bg-fill px-3 text-[12px] [--r:10px]" />
+              <button class="press sq h-8 border-[0.5px] border-line px-4 [--r:10px]">선택</button></span></label>
+          <label class="flex flex-col gap-2"><span class="text-[11px] leading-4 text-ink-2">저장</span>
+            <span class="flex gap-2"><input readonly value="/Volumes/Backup" class="sq h-8 min-w-0 flex-1 border-[0.5px] border-line bg-fill px-3 text-[12px] [--r:10px]" />
+              <button class="press sq h-8 border-[0.5px] border-line px-4 [--r:10px]">선택</button></span></label>
+        </div>
+
+        <output id="timer" class="text-[40px] leading-[48px] text-ink-2" aria-label="다음 백업까지 남은 시간">--:--</output>
+
+        <ol id="log" role="log" aria-live="polite" class="divide-y-[0.5px] divide-line text-[12px] leading-[18px]">
+          <li class="flex gap-3 py-2"><time class="text-ink-2">09:41:30</time><span>시작 5분</span></li>
+          <li class="flex gap-3 py-2"><time class="text-ink-2">09:41:32</time><span>복사 12개, 재사용 0개, 제외 0개</span></li>
+          <li class="flex gap-3 py-2"><time class="text-ink-2">09:41:32</time><span class="text-ok">완료 Projects_20261029_094132 42.0 MB</span></li>
+        </ol>
+      </div>
+
+      <footer class="flex h-7 items-center justify-between border-t-[0.5px] border-line px-8 text-[11px] text-ink-2">
+        <span>마지막 백업 09:41</span><span>보관 5개</span>
+      </footer>
+    </section>
+  </main>
+
+  <script>
+    const $ = (s) => document.querySelector(s), win = $("#win");
+
+    // 테마: OS를 따르고 ?theme=dark|light 로 강제
+    const forced = new URLSearchParams(location.search).get("theme"), mq = matchMedia("(prefers-color-scheme: dark)");
+    const applyTheme = () => (document.documentElement.dataset.theme = forced || (mq.matches ? "dark" : "light"));
+    applyTheme(); mq.addEventListener("change", applyTheme);
+
+    // 사이드바 접기 (⌘B / Ctrl+B)
+    const toggle = () => {
+      const collapsed = win.dataset.collapsed !== "true";
+      win.dataset.collapsed = collapsed;
+      $("#toggle").setAttribute("aria-label", collapsed ? "사이드바 펼치기" : "사이드바 접기");
+    };
+    $("#toggle").addEventListener("click", toggle);
+    addEventListener("keydown", (e) => { if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "b") { e.preventDefault(); toggle(); } });
+
+    // 사이드바 선택
+    document.querySelectorAll(".side-item").forEach((b) => b.addEventListener("click", () => {
+      document.querySelectorAll(".side-item").forEach((x) => x.removeAttribute("aria-current"));
+      b.setAttribute("aria-current", "page"); $("h1").textContent = b.querySelector("span").textContent;
+    }));
+
+    // 시작/중지 (목 카운트다운)
+    let tick = null, left = 300;
+    const mmss = (s) => String(Math.floor(s / 60)).padStart(2, "0") + ":" + String(s % 60).padStart(2, "0");
+    const line = (msg, cls = "") => {
+      const li = document.createElement("li"); li.className = "log-row flex gap-3 py-2";
+      li.innerHTML = `<time class="text-ink-2">${new Date().toLocaleTimeString("en-GB")}</time><span class="${cls}">${msg}</span>`;
+      $("#log").append(li); li.scrollIntoView({ block: "nearest" });
+    };
+    $("#run").addEventListener("click", () => {
+      const running = tick !== null;
+      if (running) { clearInterval(tick); tick = null; $("#timer").textContent = "--:--"; $("#timer").classList.add("text-ink-2"); line("중지"); }
+      else {
+        left = 300; $("#timer").textContent = mmss(left); $("#timer").classList.remove("text-ink-2"); line("시작 5분");
+        tick = setInterval(() => { left = left > 0 ? left - 1 : 300; $("#timer").textContent = mmss(left); }, 1000);
+      }
+      $("#run").textContent = running ? "시작" : "중지";
+    });
+  </script>
+</body>
+</html>
