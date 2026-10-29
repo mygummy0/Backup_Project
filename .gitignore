@@ -1,0 +1,5 @@
+rust/target/
+cpp/build/
+go/backup
+go/backup.exe
+__pycache__/

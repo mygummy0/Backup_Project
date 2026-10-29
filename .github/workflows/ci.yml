@@ -1,0 +1,15 @@
+name: ci
+on: [push, pull_request]
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with: { go-version: "1.22" }
+      - name: Go
+        run: cd go && go vet ./... && go build -o /tmp/bk_go . && ../tests/e2e.sh /tmp/bk_go
+      - name: Rust
+        run: cd rust && cargo clippy --release -- -D warnings && cargo build --release && ../tests/e2e.sh target/release/backup
+      - name: C++
+        run: cmake -S cpp -B cpp/build && cmake --build cpp/build && tests/e2e.sh cpp/build/backup
