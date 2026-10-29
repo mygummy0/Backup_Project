@@ -61,7 +61,7 @@ npm run build && npx vite preview --port 4173   # 브라우저 미리보기(목 
 node scripts/shots.mjs <출력폴더>   # 상태 6종 x 라이트/다크 캡처 + 접근성·상태 검증 28항목
 ```
 - **화면**: 상단에 설정 버튼(톱니), 원본·저장 폴더, 타이머와 시작/중지, 작업 기록. 설정 창에 `일반`(주기·보관)과 `고급 옵션`(증분·검증·제외) 탭이 있습니다.
-- **디자인**: JetBrains Mono(숫자·경로) + Pretendard(한글, 글리프 대체), 딥 네이비/흑백 기반, 그림자 없이 얇은 테두리, 전환 300ms, 폰트 굵기 300/400/600. 이모지·그라디언트·인디고 강조색을 쓰지 않습니다.
+- **디자인**: [Server Mono](https://github.com/internet-development/www-server-mono)(숫자·경로·시간, SIL OFL) + Pretendard(한글, 글리프 대체), 딥 네이비/흑백 기반, 그림자 없이 얇은 테두리, 전환 300ms. Server Mono가 단일 굵기(400)라 굵기는 하나만 쓰고 위계는 크기와 색으로 만듭니다. 이모지·그라디언트·인디고 강조색을 쓰지 않습니다.
 - **키보드**: Tab 순서 = 화면 순서. 포커스 표시는 키보드로 이동할 때만 2px 외곽선(마우스 클릭에는 나타나지 않음).
 - **수정하는 곳**: 색·간격·모션 `design_tokens.py`(→ `python gui-tauri/scripts/gen_tokens.py`), 문구 `src/lib/copy.ts`, 화면 배치 `src/App.tsx`, 설정 창 `src/components/SettingsDialog.tsx`, 백엔드 명령 `src-tauri/src/lib.rs`, 창 크기·아이콘 `src-tauri/tauri.conf.json`.
 - **지켜지는 규칙**: `tests/test_gui_design_guard.py` 가 간격·글자 크기·모서리·원색 클래스·굵기·그림자·그라디언트·전환 시간·이모지·폰트를 정적으로 검사합니다.

@@ -57,7 +57,7 @@
   --control-height: 40px;
   --duration: 300ms;
   --ease-out: cubic-bezier(0.16, 1.0, 0.3, 1.0);
-  --font-sans: "JetBrains Mono Variable", "JetBrains Mono", "Pretendard Variable", Pretendard, "Malgun Gothic", "Apple SD Gothic Neo", "Noto Sans CJK KR", "Noto Sans KR", NanumGothic, sans-serif;
+  --font-sans: ServerMono, "Server Mono", "Pretendard Variable", Pretendard, "Malgun Gothic", "Apple SD Gothic Neo", "Noto Sans CJK KR", "Noto Sans KR", NanumGothic, sans-serif;
   --letter-spacing: -0.02em;
   --line-height: 1.55;
 }

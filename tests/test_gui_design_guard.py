@@ -22,7 +22,7 @@ ARBITRARY = re.compile(r"(?<![\w-])[a-z-]+-\[\d+(?:\.\d+)?(?:px|rem|em)\]")
 RAW_COLOR = re.compile(r"(?<![\w-])(?:bg|text|border|ring|fill|stroke|from|to|via|outline|divide|shadow)-(?:slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose|black|white)(?:-\d{2,3})?(?![\w-])")
 HEX = re.compile(r"#[0-9A-Fa-f]{6}\b")
 EMOJI = re.compile("[\U0001F300-\U0001FAFF☀-➿️]")
-WEIGHT = re.compile(r"(?<![\w-])font-(thin|extralight|medium|bold|extrabold|black)(?![\w-])")
+WEIGHT = re.compile(r"(?<![\w-])font-(thin|extralight|light|medium|semibold|bold|extrabold|black)(?![\w-])")
 SHADOW = re.compile(r"(?<![\w-])shadow-(xs|sm|md|lg|xl|2xl|inner)(?![\w-])")
 GRADIENT = re.compile(r"(?<![\w-])(?:bg-gradient-to-\w+|bg-linear-\w+|bg-radial|bg-conic|(?:from|via|to)-[\w/\[\]-]+)")
 SCALE_HOVER = re.compile(r"(?:hover|active|focus|group-hover):scale-")
@@ -95,9 +95,9 @@ class AppCode(unittest.TestCase):
         found = [v for p in APP + VENDORED for v in scan(p, LINEAR, lambda m: True)]
         self.assertNone(found, "linear 전환 금지")
 
-    def test_anti_slop_weights_300_400_600_only(self):
+    def test_single_weight_only(self):
         found = [v for p in APP + VENDORED for v in scan(p, WEIGHT, lambda m: True)]
-        self.assertNone(found, "굵기는 font-light(300) / font-normal(400) / font-semibold(600)만 허용")
+        self.assertNone(found, "Server Mono는 단일 굵기(400): font-normal만 허용, 위계는 크기와 색으로")
 
     def test_anti_slop_no_blurry_shadows(self):
         found = [v for p in APP + VENDORED for v in scan(p, SHADOW, lambda m: True)]
@@ -130,11 +130,17 @@ class Typography(unittest.TestCase):
         for banned in ("Inter", "Roboto", "Open Sans"):
             self.assertIsNone(re.search(rf"[\"' ]{banned}[\"',]", self.css), banned)
 
-    def test_jetbrains_mono_leads_the_stack_and_is_bundled(self):
-        self.assertIn("jetbrains-mono", self.css)  # @fontsource-variable/jetbrains-mono import
+    def test_server_mono_leads_the_stack_and_is_bundled(self):
         stack = re.search(r"--font-sans:\s*([^;]+);", self.tokens).group(1)
-        self.assertTrue(stack.startswith('"JetBrains Mono Variable"'), stack)
-        self.assertLess(stack.index("JetBrains Mono"), stack.index("Pretendard"))  # Hangul falls through to Pretendard
+        self.assertTrue(stack.startswith("ServerMono"), stack)
+        self.assertLess(stack.index("ServerMono"), stack.index("Pretendard"))  # Hangul falls through to Pretendard
+        self.assertIn('font-family: "ServerMono"', self.css)
+        for name in ("ServerMono-Regular.woff2", "ServerMono-OFL.md"):  # font + its SIL OFL licence ship together
+            self.assertTrue(os.path.exists(os.path.join(SRC, "fonts", name)), name)
+
+    def test_no_synthesised_weights_and_no_jetbrains(self):
+        self.assertIn("font-synthesis: none", self.css)
+        self.assertNotIn("jetbrains", self.css.lower())
 
     def test_buttons_have_no_focus_halo(self):
         button = read(os.path.join(SRC, "components", "ui", "button.tsx"))

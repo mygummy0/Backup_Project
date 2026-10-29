@@ -83,13 +83,14 @@ FOCUS_BORDER = 2
 DURATION_MS = 300
 EASE_OUT = (0.16, 1.0, 0.3, 1.0)
 
-# JetBrains Mono is the UI face (digits, paths, timestamps). It has no Hangul, so Korean glyphs fall through
-# to Pretendard (bundled), then Hangul-capable system fonts. Inter / Roboto / Open Sans are not allowed.
-FONT_CANDIDATES = ["JetBrains Mono Variable", "JetBrains Mono", "Pretendard Variable", "Pretendard", "Malgun Gothic", "Apple SD Gothic Neo",
+# Server Mono (internet-development/www-server-mono, SIL OFL) is the UI face for digits, paths and timestamps.
+# It is a single-weight (Regular 400) face with no Hangul, so Korean glyphs fall through to Pretendard (bundled),
+# then Hangul-capable system fonts. Inter / Roboto / Open Sans are not allowed.
+FONT_CANDIDATES = ["ServerMono", "Server Mono", "Pretendard Variable", "Pretendard", "Malgun Gothic", "Apple SD Gothic Neo",
                    "Noto Sans CJK KR", "Noto Sans KR", "NanumGothic"]
 LETTER_SPACING = "-0.02em"   # Korean text
 LINE_HEIGHT = 1.55           # 1.5 - 1.6
-FONT_WEIGHTS = (300, 400, 600)
+FONT_WEIGHTS = (400,)   # Server Mono has one weight: hierarchy comes from size and colour, never faux bold
 
 
 def hex_to_rgb(h):

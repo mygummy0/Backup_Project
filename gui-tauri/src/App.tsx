@@ -19,9 +19,22 @@ import { cn } from "@/lib/utils"
 export default function App() {
   useTheme()
   const [settings, setSettings] = useState<Settings>(loadSettings)
+  const [settingsOpen, setSettingsOpen] = useState(false)
   const { running, busy, remaining, logs, invalid, clearInvalid, start, stop } = useBackup(settings)
 
   useEffect(() => saveSettings(settings), [settings])
+
+  // Ctrl+, (macOS: Cmd+,) 로 설정 창을 연다
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && event.key === ",") {
+        event.preventDefault()
+        setSettingsOpen(true)
+      }
+    }
+    window.addEventListener("keydown", onKey)
+    return () => window.removeEventListener("keydown", onKey)
+  }, [])
 
   function patch<K extends keyof Settings>(key: K, value: Settings[K]) {
     setSettings((current) => ({ ...current, [key]: value }))
@@ -36,14 +49,13 @@ export default function App() {
   const flagged = (field: "source" | "target") => invalid?.field === field || invalid?.field === "both"
 
   return (
-    <main className="mx-auto flex h-full max-w-xl flex-col gap-6 overflow-y-auto p-8">
+    <main className="flex h-full flex-col gap-4 overflow-y-auto">
       <h1 className="sr-only">{COPY.title}</h1>
 
-      <div className="flex justify-end">
-        <SettingsDialog settings={settings} locked={running} onChange={patch} />
-      </div>
-
-      <Card>
+      <Card className="relative">
+        <div className="absolute top-4 right-4">
+          <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} settings={settings} locked={running} onChange={patch} />
+        </div>
         <CardContent className="flex flex-col gap-6">
           <h2 className="sr-only">{COPY.settingsHeading}</h2>
           <FolderField
@@ -75,7 +87,7 @@ export default function App() {
           <h2 className="sr-only">{COPY.runHeading}</h2>
           <div className="flex items-center justify-between gap-4">
             <span
-              className={cn("text-4xl font-light tabular-nums", running ? "text-foreground" : "text-muted-foreground")}
+              className={cn("text-4xl font-normal tabular-nums", running ? "text-foreground" : "text-muted-foreground")}
               aria-live="off"
             >
               <span className="sr-only">{COPY.nextBackup}</span>

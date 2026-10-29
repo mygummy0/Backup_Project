@@ -1,8 +1,16 @@
-@import "@fontsource-variable/jetbrains-mono/index.css";
 @import "pretendard/dist/web/variable/pretendardvariable-dynamic-subset.css";
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "./tokens.css";
+
+/* Server Mono: 단일 굵기(Regular). 한글 글리프가 없어서 Pretendard가 이어받는다. */
+@font-face {
+  font-family: "ServerMono";
+  src: url("./fonts/ServerMono-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
 
 @custom-variant dark (&:is(.dark *));
 
@@ -48,12 +56,13 @@
   body {
     @apply bg-background font-sans text-sm text-foreground antialiased;
     font-weight: 400;
+    font-synthesis: none; /* 단일 굵기 서체: 가짜 굵기/기울임을 만들지 않는다 */
     letter-spacing: var(--letter-spacing);
     line-height: var(--line-height);
   }
   h1,
   h2 {
-    font-weight: 600;
+    font-weight: 400;
   }
   /* 모든 전환: duration-300 + cubic-bezier(0.16, 1, 0.3, 1) */
   button,

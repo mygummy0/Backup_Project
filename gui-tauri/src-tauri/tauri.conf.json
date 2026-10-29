@@ -14,9 +14,9 @@
       {
         "title": "",
         "width": 640,
-        "height": 920,
-        "minWidth": 560,
-        "minHeight": 640,
+        "height": 650,
+        "minWidth": 520,
+        "minHeight": 520,
         "resizable": true
       }
     ],

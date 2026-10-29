@@ -13,17 +13,19 @@ import { INTERVALS, KEEPS } from "@/lib/settings"
 import type { Settings } from "@/lib/settings"
 
 interface SettingsDialogProps {
+  open: boolean
+  onOpenChange: (open: boolean) => void
   settings: Settings
   locked: boolean
   onChange: <K extends keyof Settings>(key: K, value: Settings[K]) => void
 }
 
 /** 상단의 설정 창. 일반(주기·보관)과 고급 옵션(증분·검증·제외) 탭으로 나뉜다. 백업 중에는 값을 바꿀 수 없다. */
-export function SettingsDialog({ settings, locked, onChange }: SettingsDialogProps) {
+export function SettingsDialog({ open, onOpenChange, settings, locked, onChange }: SettingsDialogProps) {
   return (
-    <Dialog>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogTrigger asChild>
-        <Button type="button" variant="ghost" size="icon" aria-label={COPY.settings}>
+        <Button type="button" variant="ghost" size="icon-sm" aria-label={COPY.settings}>
           <SettingsIcon />
         </Button>
       </DialogTrigger>

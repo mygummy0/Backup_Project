@@ -21,7 +21,7 @@ const check = (name, ok, detail = "") => {
 
 const browser = await chromium.launch()
 {
-  const context = await browser.newContext({ viewport: { width: 640, height: 900 } })
+  const context = await browser.newContext({ viewport: { width: 640, height: 650 } })
   const page = await context.newPage()
   await page.goto(`${base}/?theme=light`)
   await page.getByRole("button", { name: "시작" }).click()
@@ -43,6 +43,26 @@ for (const theme of ["light", "dark"]) {
 
   // 1 초기
   await shot("1_initial")
+  if (theme === "light") {
+    const fit = await page.evaluate(() => {
+      const cards = [...document.querySelectorAll("[data-slot=card]")].map((c) => c.getBoundingClientRect())
+      return {
+        count: cards.length,
+        top: Math.round(cards[0].top),
+        left: Math.round(Math.min(...cards.map((c) => c.left))),
+        right: Math.round(Math.max(...cards.map((c) => c.right))),
+        bottom: Math.round(cards[cards.length - 1].bottom),
+        width: window.innerWidth,
+        height: window.innerHeight,
+        scrolls: document.querySelector("main").scrollHeight > document.querySelector("main").clientHeight,
+        gearInsideCard: !!document.querySelector("[data-slot=card] button[aria-label='설정']"),
+      }
+    })
+    check("카드 3개", fit.count === 3)
+    check("바깥 여백 0: 카드가 창 위·왼쪽·오른쪽·아래에 딱 붙음", fit.top === 0 && fit.left === 0 && fit.right === fit.width && fit.bottom === fit.height, JSON.stringify(fit))
+    check("기본 창 크기(640x650)에서 스크롤 없음", !fit.scrolls)
+    check("설정 버튼이 첫 카드 안에 있음", fit.gearInsideCard)
+  }
 
   // 접근성/상태 검증 (라이트에서 한 번)
   if (theme === "light") {
@@ -62,15 +82,16 @@ for (const theme of ["light", "dark"]) {
       return s.outlineStyle !== "none" && s.outlineWidth === "2px" && s.boxShadow === "none"
     }))
     const style = (sel, prop) => page.locator(sel).first().evaluate((el, p) => getComputedStyle(el)[p], prop)
-    check("JetBrains Mono 로딩", await page.evaluate(async () => { await document.fonts.load('14px "JetBrains Mono Variable"', "0"); return document.fonts.check('14px "JetBrains Mono Variable"', "0") }))
+    check("Server Mono 로딩", await page.evaluate(async () => { await document.fonts.load('14px ServerMono', "0"); return document.fonts.check('14px ServerMono', "0") }))
     check("Pretendard(한글) 로딩", await page.evaluate(async () => { await document.fonts.load('14px "Pretendard Variable"', "백"); return document.fonts.check('14px "Pretendard Variable"', "백") }))
     check("화면에 '자동' 문구 없음", !(await page.locator("body").innerText()).includes("자동"))
     check("폴더 입력에 플레이스홀더 없음", (await page.locator("#source").getAttribute("placeholder")) === null)
-    check("본문 폰트 = JetBrains Mono (한글은 Pretendard로 대체)", (await style("body", "fontFamily")).startsWith('"JetBrains Mono Variable"'))
+    check("본문 폰트 = Server Mono (한글은 Pretendard로 대체)", (await style("body", "fontFamily")).startsWith("ServerMono"))
+    check("가짜 굵기 없음 (font-synthesis: none)", (await style("body", "fontSynthesis")) === "none")
     check("자간 -0.02em (14px → -0.28px)", (await style("body", "letterSpacing")) === "-0.28px")
     check("행간 1.55 (14px → 21.7px)", (await style("body", "lineHeight")) === "21.7px")
-    check("제목 굵기 600", (await style("h1", "fontWeight")) === "600")
-    check("타이머 굵기 300", (await style("[class*=text-4xl]", "fontWeight")) === "300")
+    check("제목 굵기 400 (단일 굵기)", (await style("h1", "fontWeight")) === "400")
+    check("타이머 굵기 400 (크기로 위계)", (await style("[class*=text-4xl]", "fontWeight")) === "400")
     check("카드 그림자 없음", (await style("[data-slot=card]", "boxShadow")) === "none")
     check("전환 시간 300ms", await start.evaluate((el) => getComputedStyle(el).transitionDuration.includes("0.3s")))
 
@@ -116,6 +137,11 @@ for (const theme of ["light", "dark"]) {
   await page.keyboard.press("Escape")
   await page.waitForTimeout(400)
   if (theme === "light") {
+    await page.keyboard.press("Control+,")
+    await page.waitForTimeout(400)
+    check("Ctrl+, 로 설정 창 열림", await page.getByRole("dialog").isVisible())
+    await page.keyboard.press("Escape")
+    await page.waitForTimeout(400)
     check("Esc로 닫히고 포커스가 설정 버튼으로 복귀", (await page.getByRole("dialog").count()) === 0 && (await page.evaluate(() => document.activeElement?.getAttribute("aria-label"))) === "설정")
   }
 
