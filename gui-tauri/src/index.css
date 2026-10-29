@@ -1,3 +1,5 @@
+@import "@fontsource-variable/jetbrains-mono/index.css";
+@import "pretendard/dist/web/variable/pretendardvariable-dynamic-subset.css";
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "./tokens.css";
@@ -44,9 +46,16 @@
     height: 100%;
   }
   body {
-    @apply bg-background font-sans text-sm leading-6 text-foreground antialiased;
+    @apply bg-background font-sans text-sm text-foreground antialiased;
+    font-weight: 400;
+    letter-spacing: var(--letter-spacing);
+    line-height: var(--line-height);
   }
-  /* 모든 전환: duration-200 + cubic-bezier(0.16, 1, 0.3, 1) */
+  h1,
+  h2 {
+    font-weight: 600;
+  }
+  /* 모든 전환: duration-300 + cubic-bezier(0.16, 1, 0.3, 1) */
   button,
   input,
   textarea,
@@ -55,6 +64,10 @@
     transition-duration: var(--duration);
     transition-timing-function: var(--ease-out);
   }
+}
+
+:root {
+  --tw-animation-duration: var(--duration);
 }
 
 @keyframes busy-slide {
@@ -74,5 +87,16 @@
   .busy-slide {
     animation: none;
     transform: none;
+  }
+}
+
+/* 움직임 줄이기 설정이면 전환·애니메이션을 사실상 끈다 */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
 }

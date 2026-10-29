@@ -5,7 +5,8 @@
 
 | 폴더 | 언어 | 형태 | 비고 |
 |---|---|---|---|
-| `main.py` | Python 3 + customtkinter | GUI (Windows) | 원본 버전. `backup.spec`으로 exe 빌드 |
+| `gui-tauri/` | Tauri 2 + React + shadcn/ui | GUI | Rust 엔진 사용 (권장) |
+| `main.py` | Python 3 + customtkinter | GUI (Windows) | 레거시. `backup.spec`으로 exe 빌드 |
 | `go/` | Go 1.21+ | CLI | 표준 라이브러리만 사용 |
 | `rust/` | Rust 2021 | CLI | `chrono`, `ctrlc` |
 | `cpp/` | C++17 | CLI | CMake, 외부 의존성 없음 |
@@ -48,19 +49,28 @@ cd cpp  && cmake -S . -B build && cmake --build build   # cpp/build/backup
 - `--keep`은 `원본명_YYYYMMDD_HHMMSS` 형식의 폴더만 지우고 다른 폴더는 건드리지 않습니다.
 - 로그의 "폴더 용량"은 하드링크를 각각 합산한 겉보기 크기라, 증분 모드의 실제 디스크 사용량보다 큽니다.
 
-## GUI 디자인 (main.py)
-`design_tokens.py` 의 토큰만 사용합니다 (팔레트 · 타입 스케일 12/14/20/24/36 · 8px 간격 · 모서리 12/8). 색은 역할(role)로 참조하고, 밝은/어두운 테마를 한 쌍으로 설계했습니다.
+## GUI (Tauri · `gui-tauri/`)
+Rust 엔진(`rust/`, `backup` 크레이트)을 그대로 쓰는 데스크톱 앱입니다. React + Tailwind v4 + shadcn/ui.
 
-- **다크 모드**: OS 설정을 따르며 `BACKUP_THEME=light|dark` 로 강제할 수 있습니다. 두 테마 모두 텍스트 대비 4.5:1 이상을 테스트로 검증합니다.
-- **키보드**: Tab 순서가 화면 순서와 같고, 버튼은 Space/Enter로 동작하며 포커스 링은 키보드 이동 시에만 나타납니다. 드롭다운은 Tk 위젯 한계로 아직 Tab 대상이 아닙니다.
-- **검증 피드백**: 오류는 문제가 있는 입력창의 테두리에 표시되고 문구는 폼 아래에 남으며, 그 입력을 고치면 사라집니다.
-- **취소 가능한 백업**: 중지하면 진행 중인 복사도 중단되고 `.partial` 폴더가 정리됩니다. GUI도 CLI처럼 완료된 백업만 최종 이름을 갖습니다 (`backup_core.py`).
-- **참고한 자료** (규칙만 반영, 코드·토큰은 가져오지 않음):
-  [ui-ux-pro-max-skill](https://github.com/nextlevelbuilder/ui-ux-pro-max-skill)(접근성·상태·다크 모드 짝 설계),
-  [apple-design-marketplace](https://github.com/tekgnosis-net/apple-design-marketplace)(절제·카드 가시성),
-  [shadcn-ui/ui](https://github.com/shadcn-ui/ui)(검증 상태를 컨트롤에 표시, 의미 기반 토큰),
-  [ant-design](https://github.com/ant-design/ant-design)(오래 걸리는 작업의 취소, 오류 문구는 입력 시 해제, 다크 모드의 과한 고대비 회피).
-  이들의 색상 토큰은 채택하지 않았습니다 (Apple 보조 텍스트 `#86868B`는 흰 배경 대비 3.5:1로 AA 미달, 프로젝트 토큰과 충돌). shadcn·antd 스킬은 React/CLI 전용이라 Tk에는 적용할 수 없습니다.
+```
+cd gui-tauri
+npm install
+npm run tauri dev                  # 개발 실행 (Tauri + Vite)
+npx tauri build --no-bundle        # 릴리스 바이너리: src-tauri/target/release/backup-gui
+npm run build && npx vite preview --port 4173   # 브라우저 미리보기(목 백엔드)
+node scripts/shots.mjs <출력폴더>   # 상태 6종 x 라이트/다크 캡처 + 접근성·상태 검증 28항목
+```
+- **화면**: 상단에 설정 버튼(톱니), 원본·저장 폴더, 타이머와 시작/중지, 작업 기록. 설정 창에 `일반`(주기·보관)과 `고급 옵션`(증분·검증·제외) 탭이 있습니다.
+- **디자인**: JetBrains Mono(숫자·경로) + Pretendard(한글, 글리프 대체), 딥 네이비/흑백 기반, 그림자 없이 얇은 테두리, 전환 300ms, 폰트 굵기 300/400/600. 이모지·그라디언트·인디고 강조색을 쓰지 않습니다.
+- **키보드**: Tab 순서 = 화면 순서. 포커스 표시는 키보드로 이동할 때만 2px 외곽선(마우스 클릭에는 나타나지 않음).
+- **수정하는 곳**: 색·간격·모션 `design_tokens.py`(→ `python gui-tauri/scripts/gen_tokens.py`), 문구 `src/lib/copy.ts`, 화면 배치 `src/App.tsx`, 설정 창 `src/components/SettingsDialog.tsx`, 백엔드 명령 `src-tauri/src/lib.rs`, 창 크기·아이콘 `src-tauri/tauri.conf.json`.
+- **지켜지는 규칙**: `tests/test_gui_design_guard.py` 가 간격·글자 크기·모서리·원색 클래스·굵기·그림자·그라디언트·전환 시간·이모지·폰트를 정적으로 검사합니다.
+
+## 레거시 GUI (Tk, `main.py`)
+같은 `design_tokens.py` 를 쓰므로 색·전환이 함께 바뀝니다. 다크 모드는 OS 설정을 따르며 `BACKUP_THEME=light|dark` 로 강제할 수 있습니다.
+- 오류는 문제가 있는 입력창의 테두리에 표시되고, 그 입력을 고치면 사라집니다.
+- 중지하면 진행 중인 복사도 중단되고 `.partial` 폴더가 정리됩니다 (`backup_core.py`).
+- 참고한 자료(규칙만 반영, 코드·토큰은 가져오지 않음): [ui-ux-pro-max-skill](https://github.com/nextlevelbuilder/ui-ux-pro-max-skill), [apple-design-marketplace](https://github.com/tekgnosis-net/apple-design-marketplace), [shadcn-ui/ui](https://github.com/shadcn-ui/ui), [ant-design](https://github.com/ant-design/ant-design). 이들의 색상 토큰은 채택하지 않았습니다.
 
 ## 테스트
 `python -m unittest discover tests` 가 GUI 디자인 룰(토큰·대비·리터럴 금지)과 백업 엔진(취소·원자적 쓰기·정리)을, `tests/e2e.sh <바이너리>` 가 세 CLI의 공통 규격(SPEC.md)을 검증합니다 (일반 사용자 권한 기준 58개 항목, root에서는 권한 테스트 3개 제외).

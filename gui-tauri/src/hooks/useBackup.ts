@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react"
 import { backend } from "@/lib/backend"
 import type { BackupOptions, Invalid, LogEntry } from "@/lib/backend"
 import { COPY } from "@/lib/copy"
-import { cleanMessage, formatClock } from "@/lib/format"
+import { cleanMessage, conciseMessage, formatClock } from "@/lib/format"
 import { INTERVALS, KEEPS } from "@/lib/settings"
 import type { Settings } from "@/lib/settings"
 
@@ -38,7 +38,7 @@ export function useBackup(settings: Settings) {
   const log = useCallback((entry: LogEntry) => {
     const line: LogLine = {
       ...entry,
-      message: cleanMessage(entry.message),
+      message: conciseMessage(cleanMessage(entry.message)),
       id: lineId.current++,
       time: formatClock(new Date()),
     }

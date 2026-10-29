@@ -1,29 +1,24 @@
 // Design System v1.0 Applied
-import { ChevronDown } from "lucide-react"
+// Anti-Slop Rules Applied
 import { useEffect, useState } from "react"
 import { BusyBar } from "@/components/BusyBar"
 import { FolderField } from "@/components/FolderField"
 import { LogPanel } from "@/components/LogPanel"
-import { OptionSelect } from "@/components/OptionSelect"
+import { SettingsDialog } from "@/components/SettingsDialog"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
-import { Label } from "@/components/ui/label"
-import { Switch } from "@/components/ui/switch"
-import { Textarea } from "@/components/ui/textarea"
 import { useBackup } from "@/hooks/useBackup"
 import { useTheme } from "@/hooks/useTheme"
 import { backend } from "@/lib/backend"
 import { COPY } from "@/lib/copy"
 import { formatRemaining } from "@/lib/format"
-import { INTERVALS, KEEPS, loadSettings, saveSettings } from "@/lib/settings"
+import { loadSettings, saveSettings } from "@/lib/settings"
 import type { Settings } from "@/lib/settings"
 import { cn } from "@/lib/utils"
 
 export default function App() {
   useTheme()
   const [settings, setSettings] = useState<Settings>(loadSettings)
-  const [advancedOpen, setAdvancedOpen] = useState(false)
   const { running, busy, remaining, logs, invalid, clearInvalid, start, stop } = useBackup(settings)
 
   useEffect(() => saveSettings(settings), [settings])
@@ -41,16 +36,20 @@ export default function App() {
   const flagged = (field: "source" | "target") => invalid?.field === field || invalid?.field === "both"
 
   return (
-    <main className="mx-auto flex h-full max-w-xl flex-col gap-4 overflow-y-auto p-6">
-      <h1 className="text-2xl font-bold tracking-tight">{COPY.title}</h1>
+    <main className="mx-auto flex h-full max-w-xl flex-col gap-6 overflow-y-auto p-8">
+      <h1 className="sr-only">{COPY.title}</h1>
+
+      <div className="flex justify-end">
+        <SettingsDialog settings={settings} locked={running} onChange={patch} />
+      </div>
 
       <Card>
-        <CardContent className="flex flex-col gap-4">
+        <CardContent className="flex flex-col gap-6">
+          <h2 className="sr-only">{COPY.settingsHeading}</h2>
           <FolderField
             id="source"
             label={COPY.source.label}
             value={settings.source}
-            placeholder={COPY.source.placeholder}
             invalid={flagged("source")}
             disabled={running}
             onChange={(value) => patch("source", value)}
@@ -60,78 +59,11 @@ export default function App() {
             id="target"
             label={COPY.target.label}
             value={settings.target}
-            placeholder={COPY.target.placeholder}
             invalid={flagged("target")}
             disabled={running}
             onChange={(value) => patch("target", value)}
             onPick={() => pick("target")}
           />
-          <div className="grid grid-cols-2 gap-4">
-            <OptionSelect
-              id="interval"
-              label={COPY.interval}
-              value={settings.interval}
-              options={Object.keys(INTERVALS)}
-              disabled={running}
-              onChange={(value) => patch("interval", value)}
-            />
-            <OptionSelect
-              id="keep"
-              label={COPY.keep}
-              value={settings.keep}
-              options={Object.keys(KEEPS)}
-              disabled={running}
-              onChange={(value) => patch("keep", value)}
-            />
-          </div>
-
-          <Collapsible open={advancedOpen} onOpenChange={setAdvancedOpen}>
-            <CollapsibleTrigger asChild>
-              <Button type="button" variant="ghost" size="sm" className="-ml-2 text-muted-foreground">
-                {COPY.advanced}
-                <ChevronDown className={cn("transition-transform duration-200 ease-out", advancedOpen && "rotate-180")} />
-              </Button>
-            </CollapsibleTrigger>
-            <CollapsibleContent className="flex flex-col gap-4 pt-4">
-              <div className="flex items-center justify-between gap-4">
-                <Label htmlFor="incremental" className="flex flex-col items-start gap-1">
-                  {COPY.incremental.label}
-                  <span className="text-xs font-normal text-muted-foreground">{COPY.incremental.hint}</span>
-                </Label>
-                <Switch
-                  id="incremental"
-                  checked={settings.incremental}
-                  disabled={running}
-                  onCheckedChange={(value) => patch("incremental", value)}
-                />
-              </div>
-              <div className="flex items-center justify-between gap-4">
-                <Label htmlFor="verify" className="flex flex-col items-start gap-1">
-                  {COPY.verify.label}
-                  <span className="text-xs font-normal text-muted-foreground">{COPY.verify.hint}</span>
-                </Label>
-                <Switch
-                  id="verify"
-                  checked={settings.verify}
-                  disabled={running}
-                  onCheckedChange={(value) => patch("verify", value)}
-                />
-              </div>
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="excludes" className="text-xs font-medium text-muted-foreground">
-                  {COPY.excludes.label}
-                </Label>
-                <Textarea
-                  id="excludes"
-                  value={settings.excludes}
-                  placeholder={COPY.excludes.placeholder}
-                  disabled={running}
-                  onChange={(event) => patch("excludes", event.target.value)}
-                />
-              </div>
-            </CollapsibleContent>
-          </Collapsible>
-
           <p id="form-error" role="alert" className="min-h-4 text-xs text-destructive">
             {invalid?.message}
           </p>
@@ -139,20 +71,16 @@ export default function App() {
       </Card>
 
       <Card>
-        <CardContent className="flex flex-col gap-4">
+        <CardContent className="flex flex-col gap-6">
+          <h2 className="sr-only">{COPY.runHeading}</h2>
           <div className="flex items-center justify-between gap-4">
-            <div className="flex flex-col gap-1">
-              <span className="text-xs font-medium text-muted-foreground">{COPY.nextBackup}</span>
-              <span
-                className={cn(
-                  "text-4xl font-bold tabular-nums",
-                  running ? "text-foreground" : "text-muted-foreground",
-                )}
-                aria-live="off"
-              >
-                {remaining === null ? COPY.idleTimer : formatRemaining(remaining)}
-              </span>
-            </div>
+            <span
+              className={cn("text-4xl font-light tabular-nums", running ? "text-foreground" : "text-muted-foreground")}
+              aria-live="off"
+            >
+              <span className="sr-only">{COPY.nextBackup}</span>
+              {remaining === null ? COPY.idleTimer : formatRemaining(remaining)}
+            </span>
             <Button
               type="button"
               variant={running ? "outline" : "default"}

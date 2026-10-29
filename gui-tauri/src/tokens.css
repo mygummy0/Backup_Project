@@ -6,21 +6,21 @@
   --card-foreground: #0F172A;
   --popover: #FFFFFF;
   --popover-foreground: #0F172A;
-  --primary: #4F46E5;
+  --primary: #0F172A;
   --primary-foreground: #FFFFFF;
-  --primary-hover: #4338CA;
-  --primary-active: #3730A3;
+  --primary-hover: #1E293B;
+  --primary-active: #020617;
   --pressed: #E2E8F0;
-  --secondary: #F8FAFC;
+  --secondary: #F1F5F9;
   --secondary-foreground: #0F172A;
   --muted: #F8FAFC;
   --muted-foreground: #64748B;
-  --accent: #EEF2FF;
+  --accent: #F1F5F9;
   --accent-foreground: #0F172A;
   --destructive: #BE123C;
   --border: #E2E8F0;
   --input: #E2E8F0;
-  --ring: #4F46E5;
+  --ring: #64748B;
   --success: #047857;
   --warning: #B45309;
 }
@@ -32,10 +32,10 @@
   --card-foreground: #E2E8F0;
   --popover: #0F172A;
   --popover-foreground: #E2E8F0;
-  --primary: #4F46E5;
-  --primary-foreground: #FFFFFF;
-  --primary-hover: #4338CA;
-  --primary-active: #3730A3;
+  --primary: #F8FAFC;
+  --primary-foreground: #0F172A;
+  --primary-hover: #E2E8F0;
+  --primary-active: #CBD5E1;
   --pressed: #334155;
   --secondary: #1E293B;
   --secondary-foreground: #E2E8F0;
@@ -46,7 +46,7 @@
   --destructive: #FB7185;
   --border: #334155;
   --input: #334155;
-  --ring: #818CF8;
+  --ring: #94A3B8;
   --success: #34D399;
   --warning: #FBBF24;
 }
@@ -55,7 +55,9 @@
   --radius-card: 12px;
   --radius-control: 8px;
   --control-height: 40px;
-  --duration: 200ms;
+  --duration: 300ms;
   --ease-out: cubic-bezier(0.16, 1.0, 0.3, 1.0);
-  --font-sans: Pretendard, "Malgun Gothic", "Apple SD Gothic Neo", "Noto Sans CJK KR", "Noto Sans KR", NanumGothic, Inter, system-ui, sans-serif;
+  --font-sans: "JetBrains Mono Variable", "JetBrains Mono", "Pretendard Variable", Pretendard, "Malgun Gothic", "Apple SD Gothic Neo", "Noto Sans CJK KR", "Noto Sans KR", NanumGothic, sans-serif;
+  --letter-spacing: -0.02em;
+  --line-height: 1.55;
 }

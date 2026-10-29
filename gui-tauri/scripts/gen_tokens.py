@@ -38,7 +38,7 @@ def render():
         + f"\n:root {{\n  --radius-card: {dt.RADIUS_CARD}px;\n  --radius-control: {dt.RADIUS_CONTROL}px;\n"
         f"  --control-height: {dt.CONTROL_HEIGHT}px;\n  --duration: {dt.DURATION_MS}ms;\n"
         f"  --ease-out: cubic-bezier({', '.join(str(x) for x in dt.EASE_OUT)});\n"
-        f"  --font-sans: {fonts}, system-ui, sans-serif;\n}}\n"
+        f"  --font-sans: {fonts}, sans-serif;\n  --letter-spacing: {dt.LETTER_SPACING};\n  --line-height: {dt.LINE_HEIGHT};\n}}\n"
     )
 
 

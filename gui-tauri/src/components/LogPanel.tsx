@@ -1,6 +1,7 @@
 // Design System v1.0 Applied
+// Anti-Slop Rules Applied
 import { useEffect, useRef } from "react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
 import type { LogLine } from "@/hooks/useBackup"
 import type { Level } from "@/lib/backend"
@@ -23,10 +24,8 @@ export function LogPanel({ logs, busy }: { logs: LogLine[]; busy: boolean }) {
 
   return (
     <Card className="min-h-56 flex-1">
-      <CardHeader>
-        <CardTitle className="text-xl font-semibold">{COPY.history}</CardTitle>
-      </CardHeader>
       <CardContent className="flex min-h-0 flex-1 flex-col">
+        <h2 className="sr-only">{COPY.history}</h2>
         <div
           role="log"
           aria-live="polite"

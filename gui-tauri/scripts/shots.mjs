@@ -20,8 +20,20 @@ const check = (name, ok, detail = "") => {
 }
 
 const browser = await chromium.launch()
+{
+  const context = await browser.newContext({ viewport: { width: 640, height: 900 } })
+  const page = await context.newPage()
+  await page.goto(`${base}/?theme=light`)
+  await page.getByRole("button", { name: "시작" }).click()
+  await page.waitForTimeout(400)
+  check("마우스 클릭 뒤 버튼에 외곽선/후광 없음", await page.getByRole("button", { name: "시작" }).evaluate((el) => {
+    const s = getComputedStyle(el)
+    return s.outlineStyle === "none" && s.boxShadow === "none"
+  }))
+  await context.close()
+}
 for (const theme of ["light", "dark"]) {
-  const context = await browser.newContext({ viewport: { width: 640, height: 840 }, locale: "ko-KR" })
+  const context = await browser.newContext({ viewport: { width: 640, height: 900 }, locale: "ko-KR" })
   const page = await context.newPage()
   await page.goto(`${base}/?theme=${theme}`)
   await page.evaluate(() => localStorage.clear())
@@ -36,25 +48,39 @@ for (const theme of ["light", "dark"]) {
   if (theme === "light") {
     const order = []
     await page.locator("body").click({ position: { x: 2, y: 2 } })
-    for (let i = 0; i < 8; i++) {
+    for (let i = 0; i < 6; i++) {
       await page.keyboard.press("Tab")
       order.push(await page.evaluate(() => {
         const el = document.activeElement
-        return el.id || el.getAttribute("role") || el.textContent?.trim() || el.tagName
+        return el.id || el.getAttribute("aria-label") || el.getAttribute("role") || el.textContent?.trim() || el.tagName
       }))
     }
     console.log("tab order:", order.join(" > "))
-    check("Tab 순서 = 화면 순서", order.join(",") === "source,선택,target,선택,interval,keep,고급 옵션,시작")
-    check("키보드 포커스 링(focus-visible)", await start.evaluate((el) => getComputedStyle(el).boxShadow !== "none"))
-    check("전환 시간 200ms", await start.evaluate((el) => getComputedStyle(el).transitionDuration.includes("0.2s")))
+    check("Tab 순서 = 화면 순서", order.join(",") === "설정,source,선택,target,선택,시작")
+    check("키보드 포커스: 2px 외곽선, 후광 없음", await start.evaluate((el) => {
+      const s = getComputedStyle(el)
+      return s.outlineStyle !== "none" && s.outlineWidth === "2px" && s.boxShadow === "none"
+    }))
+    const style = (sel, prop) => page.locator(sel).first().evaluate((el, p) => getComputedStyle(el)[p], prop)
+    check("JetBrains Mono 로딩", await page.evaluate(async () => { await document.fonts.load('14px "JetBrains Mono Variable"', "0"); return document.fonts.check('14px "JetBrains Mono Variable"', "0") }))
+    check("Pretendard(한글) 로딩", await page.evaluate(async () => { await document.fonts.load('14px "Pretendard Variable"', "백"); return document.fonts.check('14px "Pretendard Variable"', "백") }))
+    check("화면에 '자동' 문구 없음", !(await page.locator("body").innerText()).includes("자동"))
+    check("폴더 입력에 플레이스홀더 없음", (await page.locator("#source").getAttribute("placeholder")) === null)
+    check("본문 폰트 = JetBrains Mono (한글은 Pretendard로 대체)", (await style("body", "fontFamily")).startsWith('"JetBrains Mono Variable"'))
+    check("자간 -0.02em (14px → -0.28px)", (await style("body", "letterSpacing")) === "-0.28px")
+    check("행간 1.55 (14px → 21.7px)", (await style("body", "lineHeight")) === "21.7px")
+    check("제목 굵기 600", (await style("h1", "fontWeight")) === "600")
+    check("타이머 굵기 300", (await style("[class*=text-4xl]", "fontWeight")) === "300")
+    check("카드 그림자 없음", (await style("[data-slot=card]", "boxShadow")) === "none")
+    check("전환 시간 300ms", await start.evaluate((el) => getComputedStyle(el).transitionDuration.includes("0.3s")))
 
     await page.mouse.move(0, 0)
     await start.hover()
     await page.waitForTimeout(350)
-    check("hover = brand-700", (await start.evaluate((el) => getComputedStyle(el).backgroundColor)) === rgb("#4338CA"))
+    check("hover = slate-800", (await start.evaluate((el) => getComputedStyle(el).backgroundColor)) === rgb("#1E293B"))
     await page.mouse.down()
     await page.waitForTimeout(350)
-    check("active = brand-800", (await start.evaluate((el) => getComputedStyle(el).backgroundColor)) === rgb("#3730A3"))
+    check("active = slate-950", (await start.evaluate((el) => getComputedStyle(el).backgroundColor)) === rgb("#020617"))
     await page.mouse.up({ button: "left" }).catch(() => {})
     await page.mouse.move(0, 0)
   }
@@ -69,11 +95,29 @@ for (const theme of ["light", "dark"]) {
     check("오류 문구 표시", (await page.getByRole("alert").innerText()).includes("모두 선택"))
   }
 
-  // 3 고급 옵션 열림
-  await page.getByRole("button", { name: "고급 옵션" }).click()
-  await page.waitForTimeout(300)
-  await shot("3_advanced")
-  await page.getByRole("button", { name: "고급 옵션" }).click()
+  // 3 설정 창: 일반 탭 -> 고급 옵션 탭
+  const gear = page.getByRole("button", { name: "설정" })
+  await gear.click()
+  await page.waitForTimeout(400)
+  await shot("3_settings_general")
+  if (theme === "light") {
+    check("설정 창이 열림", await page.getByRole("dialog").isVisible())
+    check("일반 탭에 주기·보관", (await page.locator("#interval").isVisible()) && (await page.locator("#keep").isVisible()))
+  }
+  await page.getByRole("tab", { name: "고급 옵션" }).click()
+  await page.waitForTimeout(400)
+  await shot("3b_settings_advanced")
+  if (theme === "light") {
+    check("고급 옵션 탭 선택됨", (await page.getByRole("tab", { name: "고급 옵션" }).getAttribute("aria-selected")) === "true")
+    check("고급 옵션: 증분·검증·제외", (await page.locator("#incremental").isVisible()) && (await page.locator("#verify").isVisible()) && (await page.locator("#excludes").isVisible()))
+    await page.locator("#incremental").click()
+    check("증분 스위치 켜짐", (await page.locator("#incremental").getAttribute("aria-checked")) === "true")
+  }
+  await page.keyboard.press("Escape")
+  await page.waitForTimeout(400)
+  if (theme === "light") {
+    check("Esc로 닫히고 포커스가 설정 버튼으로 복귀", (await page.getByRole("dialog").count()) === 0 && (await page.evaluate(() => document.activeElement?.getAttribute("aria-label"))) === "설정")
+  }
 
   // 4 백업 중 (진행바 + Skeleton)
   await page.locator("#source").fill("/home/user/프로젝트")

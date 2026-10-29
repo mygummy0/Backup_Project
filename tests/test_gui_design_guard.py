@@ -22,6 +22,11 @@ ARBITRARY = re.compile(r"(?<![\w-])[a-z-]+-\[\d+(?:\.\d+)?(?:px|rem|em)\]")
 RAW_COLOR = re.compile(r"(?<![\w-])(?:bg|text|border|ring|fill|stroke|from|to|via|outline|divide|shadow)-(?:slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose|black|white)(?:-\d{2,3})?(?![\w-])")
 HEX = re.compile(r"#[0-9A-Fa-f]{6}\b")
 EMOJI = re.compile("[\U0001F300-\U0001FAFF☀-➿️]")
+WEIGHT = re.compile(r"(?<![\w-])font-(thin|extralight|medium|bold|extrabold|black)(?![\w-])")
+SHADOW = re.compile(r"(?<![\w-])shadow-(xs|sm|md|lg|xl|2xl|inner)(?![\w-])")
+GRADIENT = re.compile(r"(?<![\w-])(?:bg-gradient-to-\w+|bg-linear-\w+|bg-radial|bg-conic|(?:from|via|to)-[\w/\[\]-]+)")
+SCALE_HOVER = re.compile(r"(?:hover|active|focus|group-hover):scale-")
+DURATION = re.compile(r"(?<![\w-])duration-(\d+)(?![\w-])")
 LINEAR = re.compile(r"ease-linear|transition-timing-function:\s*linear|\blinear\(")
 
 
@@ -90,10 +95,62 @@ class AppCode(unittest.TestCase):
         found = [v for p in APP + VENDORED for v in scan(p, LINEAR, lambda m: True)]
         self.assertNone(found, "linear 전환 금지")
 
+    def test_anti_slop_weights_300_400_600_only(self):
+        found = [v for p in APP + VENDORED for v in scan(p, WEIGHT, lambda m: True)]
+        self.assertNone(found, "굵기는 font-light(300) / font-normal(400) / font-semibold(600)만 허용")
+
+    def test_anti_slop_no_blurry_shadows(self):
+        found = [v for p in APP + VENDORED for v in scan(p, SHADOW, lambda m: True)]
+        self.assertNone(found, "번지는 그림자 금지: 선명한 얇은 테두리(border-border/60)를 쓴다")
+
+    def test_anti_slop_no_gradients_and_no_hover_scale(self):
+        found = [v for p in APP + VENDORED for v in scan(p, GRADIENT, lambda m: True)]
+        self.assertNone(found, "그라디언트 금지")
+        found = [v for p in APP + VENDORED for v in scan(p, SCALE_HOVER, lambda m: True)]
+        self.assertNone(found, "hover 확대 금지")
+
+    def test_anti_slop_transitions_are_300ms(self):
+        found = [v for p in APP + VENDORED for v in scan(p, DURATION, lambda m: m.group(1) != "300")]
+        self.assertNone(found, "전환은 duration-300 ease-out")
+
     def test_declares_design_system_version(self):
         for name in ("App.tsx", "components/FolderField.tsx", "components/LogPanel.tsx",
-                     "components/OptionSelect.tsx", "components/BusyBar.tsx"):
-            self.assertIn("Design System v1.0 Applied", read(os.path.join(SRC, name)), name)
+                     "components/OptionSelect.tsx", "components/BusyBar.tsx", "components/SettingsDialog.tsx"):
+            text = read(os.path.join(SRC, name))
+            self.assertIn("Design System v1.0 Applied", text, name)
+            self.assertIn("Anti-Slop Rules Applied", text, name)
+
+
+class Typography(unittest.TestCase):
+    tokens = read(os.path.join(SRC, "tokens.css"))
+    css = read(os.path.join(SRC, "index.css")) + tokens
+
+    def test_pretendard_is_bundled_and_generic_fonts_are_banned(self):
+        self.assertIn("pretendard", self.css.lower())
+        for banned in ("Inter", "Roboto", "Open Sans"):
+            self.assertIsNone(re.search(rf"[\"' ]{banned}[\"',]", self.css), banned)
+
+    def test_jetbrains_mono_leads_the_stack_and_is_bundled(self):
+        self.assertIn("jetbrains-mono", self.css)  # @fontsource-variable/jetbrains-mono import
+        stack = re.search(r"--font-sans:\s*([^;]+);", self.tokens).group(1)
+        self.assertTrue(stack.startswith('"JetBrains Mono Variable"'), stack)
+        self.assertLess(stack.index("JetBrains Mono"), stack.index("Pretendard"))  # Hangul falls through to Pretendard
+
+    def test_buttons_have_no_focus_halo(self):
+        button = read(os.path.join(SRC, "components", "ui", "button.tsx"))
+        self.assertNotIn("ring-", button)  # no ring/halo classes at all (outline only, keyboard focus only)
+        self.assertIn("focus-visible:outline-2", button)
+
+    def test_korean_letter_spacing_and_line_height(self):
+        self.assertIn("--letter-spacing: -0.02em", self.css)
+        match = re.search(r"--line-height:\s*([\d.]+)", self.css)
+        self.assertTrue(match and 1.5 <= float(match.group(1)) <= 1.6)
+
+    def test_heading_levels_do_not_skip(self):
+        text = "".join(read(p) for p in APP if p.endswith(".tsx"))
+        self.assertEqual(len(re.findall(r"<h1[ >]", text)), 1)
+        self.assertGreaterEqual(len(re.findall(r"<h2[ >]", text)), 3)
+        self.assertEqual(re.findall(r"<h[3-6][ >]", text), [])
 
 
 class Copy(unittest.TestCase):
@@ -101,8 +158,8 @@ class Copy(unittest.TestCase):
         hangul = re.compile(r"[가-힣]")
         offenders = []
         for path in APP:
-            if path.endswith(os.path.join("lib", "copy.ts")) or path.endswith(os.path.join("lib", "backend.ts")):
-                continue  # backend.ts 의 한국어는 브라우저 미리보기용 목 데이터
+            if path.endswith(tuple(os.path.join("lib", n) for n in ("copy.ts", "backend.ts", "format.ts"))):
+                continue  # backend.ts: 브라우저 미리보기용 목 데이터, format.ts: 엔진 로그 문구를 인식하는 패턴
             for n, line in enumerate(read(path).splitlines(), 1):
                 code = re.sub(r"//.*$|/\*.*?\*/", "", line)  # 주석은 허용
                 if hangul.search(code.strip().lstrip("* ")) and not line.strip().startswith(("*", "/*", "//")):

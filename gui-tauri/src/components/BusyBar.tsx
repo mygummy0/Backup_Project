@@ -1,4 +1,5 @@
 // Design System v1.0 Applied
+// Anti-Slop Rules Applied
 import { COPY } from "@/lib/copy"
 
 /** 백업 중에만 움직이는 얇은 진행 표시줄. 움직임 줄이기 설정이면 정지한다. */

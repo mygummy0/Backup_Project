@@ -1,4 +1,5 @@
 // Design System v1.0 Applied
+// Anti-Slop Rules Applied
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
@@ -14,7 +15,7 @@ interface OptionSelectProps {
 export function OptionSelect({ id, label, value, options, disabled, onChange }: OptionSelectProps) {
   return (
     <div className="flex flex-col gap-2">
-      <Label htmlFor={id} className="text-xs font-medium text-muted-foreground">
+      <Label htmlFor={id} className="text-xs font-normal text-muted-foreground">
         {label}
       </Label>
       <Select value={value} onValueChange={onChange} disabled={disabled}>

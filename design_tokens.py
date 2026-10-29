@@ -4,18 +4,15 @@ use any colour, font size, spacing or radius that is not defined here."""
 
 # ---- Color palette ------------------------------------------------------------------
 COLOR = {
-    "brand_50": "#EEF2FF",
-    "brand_400": "#818CF8",   # focus ring on dark
-    "brand_600": "#4F46E5",   # primary
-    "brand_700": "#4338CA",   # primary hover
-    "brand_800": "#3730A3",   # primary active (pressed)
     "white": "#FFFFFF",
     "slate_50": "#F8FAFC",    # page background
+    "slate_100": "#F1F5F9",   # hover surface
     "slate_200": "#E2E8F0",   # border
+    "slate_300": "#CBD5E1",   # dark pressed / ring on primary
     "slate_400": "#94A3B8",   # sub text on dark
     "slate_500": "#64748B",   # sub text
     "slate_700": "#334155",   # dark border / pressed
-    "slate_800": "#1E293B",   # dark hover / track
+    "slate_800": "#1E293B",   # primary hover / dark hover / track
     "slate_900": "#0F172A",   # main text / dark card
     "slate_950": "#020617",   # dark page
     # Semantic. emerald_600 / amber_500 are for non-text use (dots, bars); text uses the darker step
@@ -38,21 +35,22 @@ THEMES = {
     "light": {
         "page": "slate_50", "card": "white", "border": "slate_200", "field": "white", "log_bg": "slate_50",
         "text": "slate_900", "text_sub": "slate_500",
-        "primary": "brand_600", "primary_hover": "brand_700", "primary_active": "brand_800", "on_primary": "white",
-        "secondary": "white", "secondary_hover": "slate_50", "secondary_active": "slate_200",
+        # Anti-Slop: the primary action is deep navy-black, not an indigo/purple brand colour; accent area stays tiny.
+        "primary": "slate_900", "primary_hover": "slate_800", "primary_active": "slate_950", "on_primary": "white",
+        "secondary": "white", "secondary_hover": "slate_100", "secondary_active": "slate_200",
         "off_bg": "slate_200", "off_surface": "slate_50", "off_text": "slate_500",
-        "menu_hover": "brand_50", "track": "slate_200",
-        "ring": "brand_600", "ring_on_primary": "slate_900",
+        "menu_hover": "slate_100", "track": "slate_200",
+        "ring": "slate_500", "ring_on_primary": "slate_500",
         "success": "emerald_700", "error": "rose_700", "warn": "amber_700",
     },
     "dark": {
         "page": "slate_950", "card": "slate_900", "border": "slate_700", "field": "slate_950", "log_bg": "slate_950",
         "text": "slate_200", "text_sub": "slate_400",
-        "primary": "brand_600", "primary_hover": "brand_700", "primary_active": "brand_800", "on_primary": "white",
+        "primary": "slate_50", "primary_hover": "slate_200", "primary_active": "slate_300", "on_primary": "slate_900",
         "secondary": "slate_900", "secondary_hover": "slate_800", "secondary_active": "slate_700",
         "off_bg": "slate_800", "off_surface": "slate_800", "off_text": "slate_500",
         "menu_hover": "slate_800", "track": "slate_800",
-        "ring": "brand_400", "ring_on_primary": "slate_50",
+        "ring": "slate_400", "ring_on_primary": "slate_300",
         "success": "emerald_400", "error": "rose_400", "warn": "amber_400",
     },
 }
@@ -65,7 +63,7 @@ def theme_colors(theme):
 # ---- Typography scale: name -> (size px, weight) --------------------------------------
 # Tk has no "extrabold"/"medium": display uses bold, caption uses normal.
 TYPE = {
-    "display1": (36, "bold"),
+    "display1": (36, "normal"),  # large numerals read premium in a light weight
     "h1": (24, "bold"),
     "h2": (20, "bold"),
     "body_lg": (16, "normal"),
@@ -81,13 +79,17 @@ CONTROL_HEIGHT = 40
 BORDER = 1
 FOCUS_BORDER = 2
 
-# ---- Motion: duration-200, cubic-bezier(0.16, 1, 0.3, 1) -----------------------------------
-DURATION_MS = 200
+# ---- Motion: duration-300 ease-out (Anti-Slop: deliberate, never instant), cubic-bezier(0.16, 1, 0.3, 1) -----------------------------------
+DURATION_MS = 300
 EASE_OUT = (0.16, 1.0, 0.3, 1.0)
 
-# Font families tried in order; Inter has no Hangul so it comes last.
-FONT_CANDIDATES = ["Pretendard", "Malgun Gothic", "Apple SD Gothic Neo", "Noto Sans CJK KR",
-                   "Noto Sans KR", "NanumGothic", "Inter"]
+# JetBrains Mono is the UI face (digits, paths, timestamps). It has no Hangul, so Korean glyphs fall through
+# to Pretendard (bundled), then Hangul-capable system fonts. Inter / Roboto / Open Sans are not allowed.
+FONT_CANDIDATES = ["JetBrains Mono Variable", "JetBrains Mono", "Pretendard Variable", "Pretendard", "Malgun Gothic", "Apple SD Gothic Neo",
+                   "Noto Sans CJK KR", "Noto Sans KR", "NanumGothic"]
+LETTER_SPACING = "-0.02em"   # Korean text
+LINE_HEIGHT = 1.55           # 1.5 - 1.6
+FONT_WEIGHTS = (300, 400, 600)
 
 
 def hex_to_rgb(h):
