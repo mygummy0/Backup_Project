@@ -1,0 +1,23 @@
+[package]
+name = "backup-gui"
+version = "0.1.0"
+description = "자동 백업 GUI (Tauri). 백업은 ../../rust 의 backup 엔진이 수행한다."
+edition = "2021"
+
+[lib]
+name = "backup_gui_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-dialog = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+backup = { path = "../../rust" }
+
+[profile.release]
+lto = true
+strip = true

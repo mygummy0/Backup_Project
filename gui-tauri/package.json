@@ -7,7 +7,10 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "tauri": "tauri",
+    "tokens": "python3 scripts/gen_tokens.py",
+    "shots": "node scripts/shots.mjs"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.3.3",
