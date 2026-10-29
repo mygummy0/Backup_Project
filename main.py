@@ -15,9 +15,21 @@ import ctypes  # 윈도우 작업표시줄 아이콘 설정을 위해 필요
 
 import design_tokens as dt
 
-C = dt.COLOR
 SP = dt.SPACE
-ctk.set_appearance_mode("Light")
+
+
+def detect_theme():
+    """OS 설정을 따른다. BACKUP_THEME=light|dark 로 강제할 수 있다."""
+    forced = os.environ.get("BACKUP_THEME", "").lower()
+    if forced in dt.THEMES:
+        return forced
+    ctk.set_appearance_mode("System")
+    return "dark" if ctk.get_appearance_mode() == "Dark" else "light"
+
+
+THEME = detect_theme()
+ctk.set_appearance_mode(THEME.capitalize())
+C = dt.theme_colors(THEME)  # role -> hex
 
 
 def animate(widget, key, apply, start, end):
@@ -47,10 +59,12 @@ def animate(widget, key, apply, start, end):
 class Button(ctk.CTkButton):
     """primary / secondary. hover, active(pressed), disabled 상태를 모두 구현한다."""
     STYLES = {
-        "primary": dict(base="brand_600", hover="brand_700", active="brand_800", text="white",
-                        border="brand_600", off_bg="slate_200", off_text="slate_500", off_border="slate_200"),
-        "secondary": dict(base="white", hover="slate_50", active="slate_200", text="slate_900",
-                          border="slate_200", off_bg="slate_50", off_text="slate_500", off_border="slate_200"),
+        "primary": dict(base="primary", hover="primary_hover", active="primary_active", text="on_primary",
+                        border="primary", off_bg="off_bg", off_text="off_text", off_border="off_bg",
+                        ring="ring_on_primary"),
+        "secondary": dict(base="secondary", hover="secondary_hover", active="secondary_active", text="text",
+                          border="border", off_bg="off_surface", off_text="off_text", off_border="border",
+                          ring="ring"),
     }
 
     def __init__(self, master, text, command, font, variant="secondary", width=dt.CONTROL_HEIGHT * 2):
@@ -60,6 +74,14 @@ class Button(ctk.CTkButton):
                          fg_color=C[st["base"]], border_color=C[st["border"]],
                          text_color=C[st["text"]], text_color_disabled=C[st["off_text"]])
         self._variant, self._current, self._inside, self._enabled = variant, C[st["base"]], False, True
+        self._focused = False
+        # 키보드 접근: Tab으로 포커스를 받고 Space/Enter로 누른다. 마우스 클릭은 포커스를 옮기지 않으므로
+        # 포커스 링은 키보드로 이동했을 때만 나타난다 (focus-visible).
+        self._canvas.configure(takefocus=1)
+        self._canvas.bind("<FocusIn>", lambda e: self._focus(True), add="+")
+        self._canvas.bind("<FocusOut>", lambda e: self._focus(False), add="+")
+        self._canvas.bind("<space>", lambda e: self.invoke(), add="+")
+        self._canvas.bind("<Return>", lambda e: self.invoke(), add="+")
         self.bind("<Enter>", lambda e: self._enter(), add="+")
         self.bind("<Leave>", lambda e: self._leave(), add="+")
         self.bind("<ButtonPress-1>", lambda e: self._go("active"), add="+")
@@ -68,6 +90,18 @@ class Button(ctk.CTkButton):
     def _paint(self, color):
         self._current = color
         self.configure(fg_color=color)
+
+    def _focus(self, on):
+        self._focused = on and self._enabled
+        self._apply_border()
+
+    def _apply_border(self):
+        st = self.STYLES[self._variant]
+        if self._focused:
+            self.configure(border_width=dt.FOCUS_BORDER, border_color=C[st["ring"]])
+        else:
+            self.configure(border_width=dt.BORDER,
+                           border_color=C[st["border"] if self._enabled else st["off_border"]])
 
     def _go(self, key):
         if self._enabled:
@@ -84,15 +118,17 @@ class Button(ctk.CTkButton):
     def set_variant(self, variant, text):
         st = self.STYLES[variant]
         self._variant = variant
-        self.configure(text=text, text_color=C[st["text"]], border_color=C[st["border"]],
-                       text_color_disabled=C[st["off_text"]])
+        self.configure(text=text, text_color=C[st["text"]], text_color_disabled=C[st["off_text"]])
+        self._apply_border()
         self._go("hover" if self._inside else "base")
 
     def set_enabled(self, enabled):
         st = self.STYLES[self._variant]
         self._enabled = enabled
-        self.configure(state="normal" if enabled else "disabled",
-                       border_color=C[st["border"] if enabled else st["off_border"]])
+        self._canvas.configure(takefocus=1 if enabled else 0)
+        self.configure(state="normal" if enabled else "disabled")
+        self._focused = self._focused and enabled
+        self._apply_border()
         self._paint(C[st["base" if enabled else "off_bg"]])
 
 
@@ -102,9 +138,9 @@ class Field(ctk.CTkEntry):
     def __init__(self, master, variable, placeholder, font):
         super().__init__(master, textvariable=variable, placeholder_text=placeholder, font=font,
                          height=dt.CONTROL_HEIGHT, corner_radius=dt.RADIUS_CONTROL, border_width=dt.BORDER,
-                         fg_color=C["white"], border_color=C["slate_200"], text_color=C["slate_900"],
-                         placeholder_text_color=C["slate_500"])
-        self._border = C["slate_200"]
+                         fg_color=C["field"], border_color=C["border"], text_color=C["text"],
+                         placeholder_text_color=C["text_sub"])
+        self._border = C["border"]
         self.bind("<FocusIn>", lambda e: self._focus(True), add="+")
         self.bind("<FocusOut>", lambda e: self._focus(False), add="+")
 
@@ -114,15 +150,15 @@ class Field(ctk.CTkEntry):
 
     def _focus(self, on):
         self.configure(border_width=dt.FOCUS_BORDER if on else dt.BORDER)
-        animate(self, "border", self._paint, self._border, C["brand_600" if on else "slate_200"])
+        animate(self, "border", self._paint, self._border, C["ring" if on else "border"])
 
     def set_enabled(self, enabled):
         if not enabled:  # 포커스 링 초기화
             self.configure(border_width=dt.BORDER)
-            self._paint(C["slate_200"])
+            self._paint(C["border"])
         self.configure(state="normal" if enabled else "disabled",
-                       fg_color=C["white" if enabled else "slate_50"],
-                       text_color=C["slate_900" if enabled else "slate_500"])
+                       fg_color=C["field" if enabled else "off_surface"],
+                       text_color=C["text" if enabled else "off_text"])
 
 
 class Select(ctk.CTkFrame):
@@ -130,13 +166,13 @@ class Select(ctk.CTkFrame):
 
     def __init__(self, master, values, font):
         super().__init__(master, height=dt.CONTROL_HEIGHT, corner_radius=dt.RADIUS_CONTROL,
-                         border_width=dt.BORDER, border_color=C["slate_200"], fg_color=C["white"])
+                         border_width=dt.BORDER, border_color=C["border"], fg_color=C["field"])
         self.menu = ctk.CTkOptionMenu(
             self, values=values, font=font, dropdown_font=font, anchor="w",
             height=dt.CONTROL_HEIGHT - 2 * dt.BORDER, corner_radius=dt.RADIUS_CONTROL - dt.BORDER,
-            fg_color=C["white"], button_color=C["white"], button_hover_color=C["slate_50"],
-            text_color=C["slate_900"], text_color_disabled=C["slate_500"],
-            dropdown_fg_color=C["white"], dropdown_hover_color=C["brand_50"], dropdown_text_color=C["slate_900"])
+            fg_color=C["field"], button_color=C["field"], button_hover_color=C["secondary_hover"],
+            text_color=C["text"], text_color_disabled=C["off_text"],
+            dropdown_fg_color=C["card"], dropdown_hover_color=C["menu_hover"], dropdown_text_color=C["text"])
         self.menu.pack(fill="x", padx=dt.BORDER, pady=dt.BORDER)
 
     def get(self):
@@ -146,7 +182,7 @@ class Select(ctk.CTkFrame):
         self.menu.set(value)
 
     def set_enabled(self, enabled):
-        bg = C["white" if enabled else "slate_50"]
+        bg = C["field" if enabled else "off_surface"]
         self.configure(fg_color=bg)
         self.menu.configure(state="normal" if enabled else "disabled", fg_color=bg, button_color=bg)
 
@@ -167,7 +203,7 @@ class ModernBackupApp(ctk.CTk):
         self.title("자동 백업")
         self.resizable(False, True)  # 세로로 늘리면 작업 기록이 넓어진다
         self.minsize(window_width, 640)
-        self.configure(fg_color=C["slate_50"])
+        self.configure(fg_color=C["page"])
 
         try:
             base_dir = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
@@ -197,12 +233,12 @@ class ModernBackupApp(ctk.CTk):
         self.drain_ui_queue()
 
     # ---- layout ---------------------------------------------------------------------
-    def label(self, parent, text, role, color="slate_900"):
+    def label(self, parent, text, role, color="text"):
         return ctk.CTkLabel(parent, text=text, font=self.fonts[role], text_color=C[color], anchor="w")
 
     def card(self, row, **grid):
         frame = ctk.CTkFrame(self, corner_radius=dt.RADIUS_CARD, border_width=dt.BORDER,
-                             border_color=C["slate_200"], fg_color=C["white"])
+                             border_color=C["border"], fg_color=C["card"])
         frame.grid(row=row, column=0, sticky="nsew", padx=SP["6"], **grid)
         return frame
 
@@ -225,7 +261,7 @@ class ModernBackupApp(ctk.CTk):
         inner.grid_columnconfigure(0, weight=1)
         inner.grid_columnconfigure(1, weight=1)
 
-        self.label(inner, "원본 폴더", "caption", "slate_500").grid(row=0, column=0, columnspan=2, sticky="w")
+        self.label(inner, "원본 폴더", "caption", "text_sub").grid(row=0, column=0, columnspan=2, sticky="w")
         row = ctk.CTkFrame(inner, fg_color="transparent")
         row.grid(row=1, column=0, columnspan=2, sticky="ew", pady=(SP["2"], gap))
         row.grid_columnconfigure(0, weight=1)
@@ -234,7 +270,7 @@ class ModernBackupApp(ctk.CTk):
         self.btn_src = Button(row, "선택", self.select_source, self.fonts["body"])
         self.btn_src.grid(row=0, column=1, padx=(SP["2"], 0))
 
-        self.label(inner, "저장 폴더", "caption", "slate_500").grid(row=2, column=0, columnspan=2, sticky="w")
+        self.label(inner, "저장 폴더", "caption", "text_sub").grid(row=2, column=0, columnspan=2, sticky="w")
         row = ctk.CTkFrame(inner, fg_color="transparent")
         row.grid(row=3, column=0, columnspan=2, sticky="ew", pady=(SP["2"], gap))
         row.grid_columnconfigure(0, weight=1)
@@ -243,8 +279,8 @@ class ModernBackupApp(ctk.CTk):
         self.btn_dst = Button(row, "선택", self.select_target, self.fonts["body"])
         self.btn_dst.grid(row=0, column=1, padx=(SP["2"], 0))
 
-        self.label(inner, "백업 주기", "caption", "slate_500").grid(row=4, column=0, sticky="w")
-        self.label(inner, "보관할 개수", "caption", "slate_500").grid(row=4, column=1, sticky="w", padx=(gap, 0))
+        self.label(inner, "백업 주기", "caption", "text_sub").grid(row=4, column=0, sticky="w")
+        self.label(inner, "보관할 개수", "caption", "text_sub").grid(row=4, column=1, sticky="w", padx=(gap, 0))
         self.option_interval = Select(inner, list(self.interval_map.keys()), self.fonts["body"])
         self.option_interval.set("5분")
         self.option_interval.grid(row=5, column=0, sticky="ew", pady=(SP["2"], 0))
@@ -252,7 +288,7 @@ class ModernBackupApp(ctk.CTk):
         self.option_keep.grid(row=5, column=1, sticky="ew", padx=(gap, 0), pady=(SP["2"], 0))
 
         self.error_label = ctk.CTkLabel(inner, text="", height=SP["4"], font=self.fonts["caption"],
-                                        text_color=C["rose_700"], anchor="w")
+                                        text_color=C["error"], anchor="w")
         self.error_label.grid(row=6, column=0, columnspan=2, sticky="w", pady=(SP["2"], 0))
 
         # 실행 카드: 타이머 + 시작/중지 + 진행 표시
@@ -260,14 +296,14 @@ class ModernBackupApp(ctk.CTk):
         control.grid_columnconfigure(0, weight=1)
         left = ctk.CTkFrame(control, fg_color="transparent")
         left.grid(row=0, column=0, sticky="w", padx=pad, pady=pad)
-        self.label(left, "다음 백업까지", "caption", "slate_500").pack(anchor="w")
-        self.timer_label = self.label(left, "--:--", "display1", "slate_500")
+        self.label(left, "다음 백업까지", "caption", "text_sub").pack(anchor="w")
+        self.timer_label = self.label(left, "--:--", "display1", "text_sub")
         self.timer_label.pack(anchor="w")
         self.btn_toggle = Button(control, "시작", self.toggle_backup, self.fonts["body"], variant="primary",
                                  width=SP["16"] * 2)
         self.btn_toggle.grid(row=0, column=1, padx=pad)
         self.progress = ctk.CTkProgressBar(control, mode="determinate", height=SP["1"], corner_radius=SP["1"] // 2,
-                                           fg_color=C["slate_200"], progress_color=C["slate_200"])
+                                           fg_color=C["track"], progress_color=C["track"])
         self.progress.set(0)
         self.progress.grid(row=1, column=0, columnspan=2, sticky="ew", padx=pad, pady=(0, pad))
 
@@ -276,17 +312,17 @@ class ModernBackupApp(ctk.CTk):
         history.grid_columnconfigure(0, weight=1)
         history.grid_rowconfigure(1, weight=1)
         self.label(history, "작업 기록", "h2").grid(row=0, column=0, sticky="w", padx=pad, pady=(pad, gap))
-        wrap = ctk.CTkFrame(history, corner_radius=dt.RADIUS_CONTROL, fg_color=C["slate_50"])
+        wrap = ctk.CTkFrame(history, corner_radius=dt.RADIUS_CONTROL, fg_color=C["log_bg"])
         wrap.grid(row=1, column=0, sticky="nsew", padx=pad, pady=(0, pad))
-        self.log_textbox = ctk.CTkTextbox(wrap, fg_color="transparent", text_color=C["slate_900"],
+        self.log_textbox = ctk.CTkTextbox(wrap, fg_color="transparent", text_color=C["text"],
                                           font=self.fonts["body"], border_width=0, wrap="word",
-                                          scrollbar_button_color=C["slate_200"],
-                                          scrollbar_button_hover_color=C["slate_500"])
+                                          scrollbar_button_color=C["border"],
+                                          scrollbar_button_hover_color=C["text_sub"])
         self.log_textbox.pack(fill="both", expand=True, padx=SP["2"], pady=SP["2"])
-        self.log_textbox.tag_config("ts", foreground=C["slate_500"])
-        self.log_textbox.tag_config("success", foreground=C["emerald_700"])
-        self.log_textbox.tag_config("error", foreground=C["rose_700"])
-        self.log_textbox.tag_config("warn", foreground=C["amber_700"])
+        self.log_textbox.tag_config("ts", foreground=C["text_sub"])
+        self.log_textbox.tag_config("success", foreground=C["success"])
+        self.log_textbox.tag_config("error", foreground=C["error"])
+        self.log_textbox.tag_config("warn", foreground=C["warn"])
         self.log_textbox.configure(state="disabled")
 
 
@@ -318,11 +354,11 @@ class ModernBackupApp(ctk.CTk):
 
     def set_busy(self, busy):
         if busy:  # 대기 중에는 진행 색을 트랙과 같게 해서 보이지 않게 한다
-            self.progress.configure(mode="indeterminate", progress_color=C["brand_600"])
+            self.progress.configure(mode="indeterminate", progress_color=C["primary"])
             self.progress.start()
         else:
             self.progress.stop()
-            self.progress.configure(mode="determinate", progress_color=C["slate_200"])
+            self.progress.configure(mode="determinate", progress_color=C["track"])
             self.progress.set(0)
 
     @staticmethod
@@ -372,12 +408,11 @@ class ModernBackupApp(ctk.CTk):
             return
 
         self.clear_error()
-        self.focus_set()
         self.set_input_state("disabled")
 
         self.is_auto_running = True
         self.btn_toggle.set_variant("secondary", "중지")
-        self.timer_label.configure(text_color=C["slate_900"])
+        self.timer_label.configure(text_color=C["text"])
 
         interval_str = self.option_interval.get()
         self.log(f"자동 백업 시작됨 (주기: {interval_str})")
@@ -408,7 +443,7 @@ class ModernBackupApp(ctk.CTk):
         self.set_input_state("normal")
 
         self.btn_toggle.set_variant("primary", "시작")
-        self.timer_label.configure(text="--:--", text_color=C["slate_500"])
+        self.timer_label.configure(text="--:--", text_color=C["text_sub"])
         self.log("자동 백업이 사용자에 의해 중지되었습니다.")
 
     def schedule_next(self):

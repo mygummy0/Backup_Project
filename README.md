@@ -48,8 +48,15 @@ cd cpp  && cmake -S . -B build && cmake --build build   # cpp/build/backup
 - `--keep`은 `원본명_YYYYMMDD_HHMMSS` 형식의 폴더만 지우고 다른 폴더는 건드리지 않습니다.
 - 로그의 "폴더 용량"은 하드링크를 각각 합산한 겉보기 크기라, 증분 모드의 실제 디스크 사용량보다 큽니다.
 
+## GUI 디자인 (main.py)
+`design_tokens.py` 의 토큰만 사용합니다 (팔레트 · 타입 스케일 12/14/20/24/36 · 8px 간격 · 모서리 12/8). 색은 역할(role)로 참조하고, 밝은/어두운 테마를 한 쌍으로 설계했습니다.
+
+- **다크 모드**: OS 설정을 따르며 `BACKUP_THEME=light|dark` 로 강제할 수 있습니다. 두 테마 모두 텍스트 대비 4.5:1 이상을 테스트로 검증합니다.
+- **키보드**: Tab 순서가 화면 순서와 같고, 버튼은 Space/Enter로 동작하며 포커스 링은 키보드 이동 시에만 나타납니다. 드롭다운은 Tk 위젯 한계로 아직 Tab 대상이 아닙니다.
+- **참고한 스킬**: [ui-ux-pro-max-skill](https://github.com/nextlevelbuilder/ui-ux-pro-max-skill)(접근성·상태·다크 모드 짝 설계 규칙), [apple-design-marketplace](https://github.com/tekgnosis-net/apple-design-marketplace)(절제·카드 가시성 원칙). 두 스킬의 색상 토큰은 채택하지 않았습니다 (Apple의 보조 텍스트 `#86868B`는 흰 배경 대비 3.5:1로 AA 미달이고, 프로젝트 토큰과 충돌).
+
 ## 테스트
-`tests/e2e.sh <바이너리>` 가 세 CLI의 공통 규격(SPEC.md)을 검증합니다 (일반 사용자 권한 기준 58개 항목, root에서는 권한 테스트 3개 제외).
+`python -m unittest tests.test_design_tokens` 가 GUI 디자인 룰(토큰·대비·리터럴 금지)을, `tests/e2e.sh <바이너리>` 가 세 CLI의 공통 규격(SPEC.md)을 검증합니다 (일반 사용자 권한 기준 58개 항목, root에서는 권한 테스트 3개 제외).
 GitHub Actions가 Linux · macOS · Windows에서 자동으로 실행합니다. Windows는 로컬에서 검증하지 못해 실패를 허용하는 상태입니다.
 
 ```
