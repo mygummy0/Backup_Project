@@ -26,8 +26,8 @@ class ModernBackupApp(ctk.CTk):
             pass # 윈도우가 아니거나 오류가 나면 무시
 
         # --- 2. 창 크기 설정 ---
-        window_width = 950
-        window_height = 600
+        window_width = 640
+        window_height = 520
         self.title("자동 백업 프로그램")
         self.resizable(False, False)
 
@@ -55,64 +55,50 @@ class ModernBackupApp(ctk.CTk):
         self.keep_map = {"무제한": 0, "최근 3개": 3, "최근 5개": 5, "최근 10개": 10, "최근 30개": 30}
         self.interval_map = {"30초": 30, "1분": 60, "5분": 300, "10분": 600, "30분": 1800, "1시간": 3600}
 
-        # --- 레이아웃 구성 ---
-        self.grid_columnconfigure(1, weight=1)
+        # --- 레이아웃: 한 열, 무채색, 강조색은 시작 버튼 하나뿐 ---
+        self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(0, weight=1)
+        body = ctk.CTkFrame(self, fg_color="transparent")
+        body.grid(row=0, column=0, sticky="nsew", padx=24, pady=24)
+        body.grid_columnconfigure(1, weight=1)
+        body.grid_rowconfigure(4, weight=1)
 
-        # 왼쪽 사이드바
-        self.sidebar_frame = ctk.CTkFrame(self, width=300, corner_radius=0)
-        self.sidebar_frame.grid(row=0, column=0, sticky="nsew")
-        self.setup_sidebar()
+        neutral = dict(fg_color="#333333", hover_color="#3d3d3d")
 
-        # 오른쪽 메인
-        self.main_frame = ctk.CTkFrame(self, corner_radius=0, fg_color="transparent")
-        self.main_frame.grid(row=0, column=1, sticky="nsew", padx=20, pady=20)
-        self.setup_main_area()
+        ctk.CTkLabel(body, text="원본", anchor="w").grid(row=0, column=0, sticky="w", padx=(0, 12), pady=6)
+        self.entry_src = ctk.CTkEntry(body, textvariable=self.source_dir)
+        self.entry_src.grid(row=0, column=1, sticky="ew", pady=6)
+        self.btn_src = ctk.CTkButton(body, text="선택", width=64, command=self.select_source, **neutral)
+        self.btn_src.grid(row=0, column=2, padx=(8, 0), pady=6)
 
-    def setup_sidebar(self):
-        # 1. 원본 폴더 설정
-        ctk.CTkLabel(self.sidebar_frame, text="원본 폴더 (Source)", anchor="w").pack(padx=20, pady=(10, 0), anchor="w")
-        self.entry_src = ctk.CTkEntry(self.sidebar_frame, textvariable=self.source_dir, placeholder_text="선택된 폴더 없음")
-        self.entry_src.pack(padx=20, pady=5, fill="x")
-        
-        self.btn_src = ctk.CTkButton(self.sidebar_frame, text="폴더 선택", command=self.select_source, fg_color="#444", hover_color="#555")
-        self.btn_src.pack(padx=20, pady=5, fill="x")
+        ctk.CTkLabel(body, text="저장", anchor="w").grid(row=1, column=0, sticky="w", padx=(0, 12), pady=6)
+        self.entry_dst = ctk.CTkEntry(body, textvariable=self.target_dir)
+        self.entry_dst.grid(row=1, column=1, sticky="ew", pady=6)
+        self.btn_dst = ctk.CTkButton(body, text="선택", width=64, command=self.select_target, **neutral)
+        self.btn_dst.grid(row=1, column=2, padx=(8, 0), pady=6)
 
-        ctk.CTkLabel(self.sidebar_frame, text="", height=10).pack()
+        options = ctk.CTkFrame(body, fg_color="transparent")
+        options.grid(row=2, column=0, columnspan=3, sticky="w", pady=(10, 0))
+        menu = dict(fg_color="#333333", button_color="#333333", button_hover_color="#3d3d3d", width=120)
+        ctk.CTkLabel(options, text="주기").pack(side="left", padx=(0, 8))
+        self.option_interval = ctk.CTkOptionMenu(options, values=list(self.interval_map.keys()), **menu)
+        self.option_interval.set("5분")
+        self.option_interval.pack(side="left", padx=(0, 24))
+        ctk.CTkLabel(options, text="보관").pack(side="left", padx=(0, 8))
+        self.option_keep = ctk.CTkOptionMenu(options, values=list(self.keep_map.keys()), **menu)
+        self.option_keep.pack(side="left")
 
-        # 2. 저장 폴더 설정
-        ctk.CTkLabel(self.sidebar_frame, text="저장 폴더 (Target)", anchor="w").pack(padx=20, pady=(10, 0), anchor="w")
-        self.entry_dst = ctk.CTkEntry(self.sidebar_frame, textvariable=self.target_dir, placeholder_text="선택된 폴더 없음")
-        self.entry_dst.pack(padx=20, pady=5, fill="x")
-        
-        self.btn_dst = ctk.CTkButton(self.sidebar_frame, text="폴더 선택", command=self.select_target, fg_color="#444", hover_color="#555")
-        self.btn_dst.pack(padx=20, pady=5, fill="x")
+        control = ctk.CTkFrame(body, fg_color="transparent")
+        control.grid(row=3, column=0, columnspan=3, sticky="ew", pady=24)
+        control.grid_columnconfigure(0, weight=1)
+        self.timer_label = ctk.CTkLabel(control, text="--:--", font=ctk.CTkFont(size=34, weight="bold"), text_color="#8a8a8a")
+        self.timer_label.grid(row=0, column=0, sticky="w")
+        self.btn_toggle = ctk.CTkButton(control, text="시작", width=120, height=44, command=self.toggle_backup,
+                                        fg_color="#2CC985", hover_color="#229A65", text_color="#0b0b0b")
+        self.btn_toggle.grid(row=0, column=1)
 
-        # 3. 주기 설정
-        ctk.CTkLabel(self.sidebar_frame, text="백업 주기", anchor="w").pack(padx=20, pady=(30, 0), anchor="w")
-        self.option_interval = ctk.CTkOptionMenu(self.sidebar_frame, values=list(self.interval_map.keys()))
-        self.option_interval.pack(padx=20, pady=5, fill="x")
-
-        # 3-1. 보관 개수 설정
-        ctk.CTkLabel(self.sidebar_frame, text="보관할 백업 개수", anchor="w").pack(padx=20, pady=(20, 0), anchor="w")
-        self.option_keep = ctk.CTkOptionMenu(self.sidebar_frame, values=list(self.keep_map.keys()))
-        self.option_keep.pack(padx=20, pady=5, fill="x")
-
-        # 4. 시작/중지 버튼
-        self.btn_toggle = ctk.CTkButton(self.sidebar_frame, text="자동 백업 시작", command=self.toggle_backup, 
-                                        height=50, font=ctk.CTkFont(size=16, weight="bold"),
-                                        fg_color="#2CC985", hover_color="#229A65")
-        self.btn_toggle.pack(padx=20, pady=(40, 20), fill="x", side="bottom")
-
-        # 5. 타이머 표시
-        self.timer_label = ctk.CTkLabel(self.sidebar_frame, text="준비중", font=ctk.CTkFont(size=30, weight="bold"), text_color="#2CC985")
-        self.timer_label.pack(side="bottom", pady=10)
-
-    def setup_main_area(self):
-        ctk.CTkLabel(self.main_frame, text="실시간 작업 로그", font=ctk.CTkFont(size=18, weight="bold")).pack(anchor="w", pady=(0, 10))
-        self.log_textbox = ctk.CTkTextbox(self.main_frame, width=400, corner_radius=10, font=("Consolas", 14))
-        self.log_textbox.pack(fill="both", expand=True)
-        self.log_textbox.insert("0.0", "시스템이 준비되었습니다.\n설정 후 '자동 백업 시작'을 눌러주세요.\n\n")
+        self.log_textbox = ctk.CTkTextbox(body, corner_radius=8, font=("Consolas", 13), fg_color="#1f1f1f")
+        self.log_textbox.grid(row=4, column=0, columnspan=3, sticky="nsew")
         self.log_textbox.configure(state="disabled")
 
     def set_input_state(self, state):
@@ -159,11 +145,9 @@ class ModernBackupApp(ctk.CTk):
             return
 
         self.set_input_state("disabled")
-        messagebox.showinfo("알림", "자동 백업이 시작되었습니다.\n실행 중에는 설정을 변경할 수 없습니다.")
         
         self.is_auto_running = True
-        self.btn_toggle.configure(text="백업 중지 (Stop)", fg_color="#FF5555", hover_color="#CC0000")
-        self.timer_label.configure(text_color="#FF5555")
+        self.btn_toggle.configure(text="중지", fg_color="#333333", hover_color="#3d3d3d", text_color="#e5e5e5")
         
         interval_str = self.option_interval.get()
         self.log(f"자동 백업 시작됨 (주기: {interval_str})")
@@ -192,10 +176,9 @@ class ModernBackupApp(ctk.CTk):
         self.is_auto_running = False
         
         self.set_input_state("normal")
-        messagebox.showinfo("알림", "자동 백업이 중지되었습니다.\n이제 설정을 변경할 수 있습니다.")
 
-        self.btn_toggle.configure(text="자동 백업 시작", fg_color="#2CC985", hover_color="#229A65")
-        self.timer_label.configure(text="Stopped", text_color="gray")
+        self.btn_toggle.configure(text="시작", fg_color="#2CC985", hover_color="#229A65", text_color="#0b0b0b")
+        self.timer_label.configure(text="--:--")
         self.log("자동 백업이 사용자에 의해 중지되었습니다.")
 
     def schedule_next(self):
@@ -213,7 +196,7 @@ class ModernBackupApp(ctk.CTk):
             self.timer_label.configure(text=f"{m:02d}:{s:02d}")
             self.after(1000, self.update_timer)
         else:
-            self.timer_label.configure(text="✅ 백업 완료")
+            self.timer_label.configure(text="00:00")
             self.run_backup_process()
             self.schedule_next()
             self.after(1000, self.update_timer)
@@ -224,7 +207,7 @@ class ModernBackupApp(ctk.CTk):
 
     def _backup_task(self):
         if not self.backup_lock.acquire(blocking=False):
-            self.after(0, lambda: self.log("⚠ 이전 백업이 아직 진행 중이라 이번 백업은 건너뜁니다."))
+            self.after(0, lambda: self.log("이전 백업이 진행 중이라 건너뜁니다."))
             return
         try:
             self._do_backup()
@@ -240,9 +223,9 @@ class ModernBackupApp(ctk.CTk):
         for old in names[:-keep]:
             try:
                 shutil.rmtree(os.path.join(dst, old))
-                self.after(0, lambda o=old: self.log(f"🗑 오래된 백업 삭제: {o}"))
+                self.after(0, lambda o=old: self.log(f"삭제: {o}"))
             except Exception as e:
-                self.after(0, lambda o=old, err=e: self.log(f"❌ 오래된 백업 삭제 실패: {o} ({err})"))
+                self.after(0, lambda o=old, err=e: self.log(f"삭제 실패: {o} ({err})"))
 
     def _do_backup(self):
         src = self.source_dir.get()
@@ -275,12 +258,12 @@ class ModernBackupApp(ctk.CTk):
             size_str = readable_size(total_size)
 
             # 4️⃣ 로그 출력
-            self.after(0, lambda: self.log(f"✅ 백업 완료: {os.path.basename(target_path)} (폴더 용량: {size_str})"))
+            self.after(0, lambda: self.log(f"백업 완료: {os.path.basename(target_path)} (폴더 용량: {size_str})"))
 
             self._prune_old_backups(dst, os.path.basename(src), self.keep_map[self._keep_choice])
 
         except Exception as e:
-            self.after(0, lambda err=e: self.log(f"❌ 오류 발생: {err}"))
+            self.after(0, lambda err=e: self.log(f"오류: {err}"))
 
 
 if __name__ == "__main__":
