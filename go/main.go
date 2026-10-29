@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"flag"
 	"fmt"
 	"io"
@@ -12,6 +13,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 )
 
@@ -25,14 +27,31 @@ func logf(format string, a ...any) {
 	}
 }
 
-// parseInterval accepts "30s", "1m", "1h" (number + unit).
+// ---- options ----------------------------------------------------------------
+
+type options struct {
+	src, dst    string
+	keep        int
+	incremental bool
+	excludes    []string
+	verify      bool
+	dryRun      bool
+}
+
+type stringList []string
+
+func (s *stringList) String() string     { return strings.Join(*s, ",") }
+func (s *stringList) Set(v string) error { *s = append(*s, v); return nil }
+
+// parseInterval accepts "30s", "1m", "1h" (positive number + unit).
 func parseInterval(s string) (time.Duration, error) {
+	bad := fmt.Errorf("잘못된 주기: %q (예: 30s, 5m, 1h)", s)
 	if len(s) < 2 {
-		return 0, fmt.Errorf("잘못된 주기: %q (예: 30s, 5m, 1h)", s)
+		return 0, bad
 	}
 	n, err := strconv.Atoi(s[:len(s)-1])
 	if err != nil || n <= 0 {
-		return 0, fmt.Errorf("잘못된 주기: %q (예: 30s, 5m, 1h)", s)
+		return 0, bad
 	}
 	switch s[len(s)-1] {
 	case 's':
@@ -42,7 +61,7 @@ func parseInterval(s string) (time.Duration, error) {
 	case 'h':
 		return time.Duration(n) * time.Hour, nil
 	}
-	return 0, fmt.Errorf("잘못된 주기: %q (예: 30s, 5m, 1h)", s)
+	return 0, bad
 }
 
 func readableSize(b float64) string {
@@ -54,6 +73,61 @@ func readableSize(b float64) string {
 	}
 	return fmt.Sprintf("%.1f PB", b)
 }
+
+// ---- exclude globs (see SPEC.md) --------------------------------------------
+
+// globMatch: '*' = any run of non-'/', '**' = any run incl. '/', '?' = one non-'/' rune.
+func globMatch(p, s []rune) bool {
+	for len(p) > 0 {
+		switch p[0] {
+		case '*':
+			deep := len(p) > 1 && p[1] == '*'
+			if deep {
+				p = p[2:]
+			} else {
+				p = p[1:]
+			}
+			for i := 0; ; i++ {
+				if globMatch(p, s[i:]) {
+					return true
+				}
+				if i >= len(s) || (!deep && s[i] == '/') {
+					return false
+				}
+			}
+		case '?':
+			if len(s) == 0 || s[0] == '/' {
+				return false
+			}
+			p, s = p[1:], s[1:]
+		default:
+			if len(s) == 0 || s[0] != p[0] {
+				return false
+			}
+			p, s = p[1:], s[1:]
+		}
+	}
+	return len(s) == 0
+}
+
+func excluded(patterns []string, rel, name string) bool {
+	for _, pat := range patterns {
+		pat = strings.Trim(pat, "/")
+		if pat == "" {
+			continue
+		}
+		target := name
+		if strings.Contains(pat, "/") {
+			target = rel
+		}
+		if globMatch([]rune(pat), []rune(target)) {
+			return true
+		}
+	}
+	return false
+}
+
+// ---- validation ---------------------------------------------------------------
 
 // validate rejects missing dirs and a target located inside (or equal to) the source,
 // which would otherwise recurse forever.
@@ -85,36 +159,47 @@ func validate(src, dst string) (string, string, error) {
 	return absSrc, absDst, nil
 }
 
-func copyDir(src, dst string) (skipped int, err error) {
-	err = filepath.WalkDir(src, func(p string, d fs.DirEntry, werr error) error {
-		if werr != nil {
-			return werr
+// ---- copying ------------------------------------------------------------------
+
+type stats struct{ copied, reused, excluded, skipped, verified int }
+
+func sameContent(a, b string) (bool, error) {
+	fa, err := os.Open(a)
+	if err != nil {
+		return false, err
+	}
+	defer fa.Close()
+	fb, err := os.Open(b)
+	if err != nil {
+		return false, err
+	}
+	defer fb.Close()
+	ba, bb := make([]byte, 64<<10), make([]byte, 64<<10)
+	for {
+		na, ea := io.ReadFull(fa, ba)
+		nb, eb := io.ReadFull(fb, bb)
+		if na != nb || !bytes.Equal(ba[:na], bb[:nb]) {
+			return false, nil
 		}
-		rel, _ := filepath.Rel(src, p)
-		out := filepath.Join(dst, rel)
-		info, err := d.Info()
-		if err != nil {
-			return err
+		if ea != nil || eb != nil {
+			if (ea == io.EOF || ea == io.ErrUnexpectedEOF) && (eb == io.EOF || eb == io.ErrUnexpectedEOF) {
+				return true, nil
+			}
+			if ea != nil && ea != io.EOF && ea != io.ErrUnexpectedEOF {
+				return false, ea
+			}
+			return false, eb
 		}
-		switch {
-		case d.IsDir():
-			return os.MkdirAll(out, info.Mode().Perm()|0o700)
-		case info.Mode()&fs.ModeSymlink != 0, !info.Mode().IsRegular():
-			skipped++
-			return nil
-		}
-		return copyFile(p, out, info.Mode().Perm())
-	})
-	return skipped, err
+	}
 }
 
-func copyFile(src, dst string, mode fs.FileMode) error {
+func copyFile(src, dst string, info fs.FileInfo) error {
 	in, err := os.Open(src)
 	if err != nil {
 		return err
 	}
 	defer in.Close()
-	out, err := os.OpenFile(dst, os.O_WRONLY|os.O_CREATE|os.O_EXCL, mode)
+	out, err := os.OpenFile(dst, os.O_WRONLY|os.O_CREATE|os.O_EXCL, info.Mode().Perm())
 	if err != nil {
 		return err
 	}
@@ -122,7 +207,80 @@ func copyFile(src, dst string, mode fs.FileMode) error {
 		out.Close()
 		return err
 	}
-	return out.Close()
+	if err := out.Close(); err != nil {
+		return err
+	}
+	return os.Chtimes(dst, info.ModTime(), info.ModTime())
+}
+
+// copyTree mirrors srcDir into dstDir. prevDir (may be "") is the previous snapshot used
+// for incremental reuse. With o.dryRun nothing is written.
+func copyTree(o *options, st *stats, srcDir, dstDir, prevDir, rel string) error {
+	entries, err := os.ReadDir(srcDir)
+	if err != nil {
+		return err
+	}
+	for _, e := range entries {
+		name := e.Name()
+		relPath := name
+		if rel != "" {
+			relPath = rel + "/" + name
+		}
+		if excluded(o.excludes, relPath, name) {
+			st.excluded++
+			continue
+		}
+		info, err := os.Lstat(filepath.Join(srcDir, name))
+		if err != nil {
+			return err
+		}
+		from, to := filepath.Join(srcDir, name), filepath.Join(dstDir, name)
+		switch {
+		case info.IsDir():
+			if !o.dryRun {
+				if err := os.Mkdir(to, info.Mode().Perm()|0o700); err != nil {
+					return err
+				}
+			}
+			prevSub := ""
+			if prevDir != "" {
+				prevSub = filepath.Join(prevDir, name)
+			}
+			if err := copyTree(o, st, from, to, prevSub, relPath); err != nil {
+				return err
+			}
+		case info.Mode().IsRegular():
+			if prevDir != "" {
+				pi, perr := os.Lstat(filepath.Join(prevDir, name))
+				if perr == nil && pi.Mode().IsRegular() && pi.Size() == info.Size() && pi.ModTime().Equal(info.ModTime()) {
+					if o.dryRun || os.Link(filepath.Join(prevDir, name), to) == nil {
+						st.reused++
+						continue
+					}
+				}
+			}
+			st.copied++
+			if o.dryRun {
+				continue
+			}
+			if err := copyFile(from, to, info); err != nil {
+				return err
+			}
+			if o.verify {
+				same, err := sameContent(from, to)
+				if err != nil {
+					return err
+				}
+				if !same {
+					return fmt.Errorf("검증 실패: %s", relPath)
+				}
+				st.verified++
+			}
+		default:
+			st.skipped++
+		}
+	}
+	return nil
 }
 
 func dirSize(root string) int64 {
@@ -138,15 +296,12 @@ func dirSize(root string) int64 {
 	return total
 }
 
-// prune keeps only the newest `keep` backups of this source (keep <= 0 means unlimited).
-func prune(dst, base string, keep int) {
-	if keep <= 0 {
-		return
-	}
+// backupNames lists complete backups of base in dst, oldest first (".partial" dirs never match).
+func backupNames(dst, base string) []string {
 	re := regexp.MustCompile("^" + regexp.QuoteMeta(base) + `_\d{8}_\d{6}$`)
 	entries, err := os.ReadDir(dst)
 	if err != nil {
-		return
+		return nil
 	}
 	var names []string
 	for _, e := range entries {
@@ -155,6 +310,15 @@ func prune(dst, base string, keep int) {
 		}
 	}
 	sort.Strings(names)
+	return names
+}
+
+// prune keeps only the newest `keep` backups of this source (keep <= 0 means unlimited).
+func prune(dst, base string, keep int) {
+	if keep <= 0 {
+		return
+	}
+	names := backupNames(dst, base)
 	for len(names) > keep {
 		if err := os.RemoveAll(filepath.Join(dst, names[0])); err != nil {
 			logf("❌ 오래된 백업 삭제 실패: %s (%v)", names[0], err)
@@ -165,20 +329,64 @@ func prune(dst, base string, keep int) {
 	}
 }
 
-func runBackup(src, dst string, keep int) {
-	base := filepath.Base(src)
+func runBackup(o *options) bool {
+	base := filepath.Base(o.src)
 	name := fmt.Sprintf("%s_%s", base, time.Now().Format("20060102_150405"))
-	target := filepath.Join(dst, name)
-	skipped, err := copyDir(src, target)
-	if err != nil {
+	final := filepath.Join(o.dst, name)
+	partial := final + ".partial"
+
+	if _, err := os.Lstat(final); err == nil {
+		logf("❌ 오류 발생: 이미 존재하는 백업입니다: %s", name)
+		return false
+	}
+	prev := ""
+	if o.incremental {
+		if names := backupNames(o.dst, base); len(names) > 0 {
+			prev = filepath.Join(o.dst, names[len(names)-1])
+		}
+	}
+
+	st := &stats{}
+	if !o.dryRun {
+		if err := os.Mkdir(partial, 0o700); err != nil {
+			logf("❌ 오류 발생: %v", err)
+			return false
+		}
+	}
+	if err := copyTree(o, st, o.src, partial, prev, ""); err != nil {
+		if !o.dryRun {
+			os.RemoveAll(partial)
+		}
 		logf("❌ 오류 발생: %v", err)
-		return
+		return false
 	}
-	logf("✅ 백업 완료: %s (폴더 용량: %s)", name, readableSize(float64(dirSize(dst))))
-	if skipped > 0 {
-		logf("⚠ 심볼릭 링크/특수 파일 %d개는 건너뛰었습니다", skipped)
+	if o.dryRun {
+		logf("🧪 [dry-run] 백업 계획: %s", name)
+	} else {
+		if err := os.Rename(partial, final); err != nil {
+			os.RemoveAll(partial)
+			logf("❌ 오류 발생: %v", err)
+			return false
+		}
+		if o.verify {
+			logf("🔍 검증 완료: %d개 파일 일치", st.verified)
+		}
 	}
-	prune(dst, base, keep)
+	logf("📦 복사 %d개, 재사용 %d개, 제외 %d개", st.copied, st.reused, st.excluded)
+	if st.skipped > 0 {
+		logf("⚠ 심볼릭 링크/특수 파일 %d개는 건너뛰었습니다", st.skipped)
+	}
+	if !o.dryRun {
+		logf("✅ 백업 완료: %s (폴더 용량: %s)", name, readableSize(float64(dirSize(o.dst))))
+		prune(o.dst, base, o.keep)
+	}
+	return true
+}
+
+func usageError(msg string) {
+	fmt.Fprintln(os.Stderr, msg)
+	flag.Usage()
+	os.Exit(2)
 }
 
 func main() {
@@ -187,18 +395,26 @@ func main() {
 	intervalFlag := flag.String("interval", "5m", "백업 주기 (예: 30s, 5m, 1h)")
 	keep := flag.Int("keep", 0, "보관할 최근 백업 개수 (0 = 무제한)")
 	once := flag.Bool("once", false, "한 번만 백업하고 종료")
+	mode := flag.String("mode", "full", "full | incremental (변경 없는 파일은 직전 백업에 하드링크)")
+	var excludes stringList
+	flag.Var(&excludes, "exclude", "제외할 글롭 패턴 (여러 번 지정 가능)")
+	verify := flag.Bool("verify", false, "복사한 파일을 원본과 바이트 비교")
+	dryRun := flag.Bool("dry-run", false, "아무것도 쓰지 않고 계획만 출력")
 	logPath := flag.String("log-file", "", "로그를 추가로 저장할 파일")
 	flag.Parse()
 
 	if *srcFlag == "" || *dstFlag == "" {
-		fmt.Fprintln(os.Stderr, "--source 와 --target 은 필수입니다.")
-		flag.Usage()
-		os.Exit(2)
+		usageError("--source 와 --target 은 필수입니다.")
 	}
 	interval, err := parseInterval(*intervalFlag)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(2)
+		usageError(err.Error())
+	}
+	if *keep < 0 {
+		usageError("--keep 은 0 이상의 정수여야 합니다.")
+	}
+	if *mode != "full" && *mode != "incremental" {
+		usageError(fmt.Sprintf("잘못된 모드: %q (full 또는 incremental)", *mode))
 	}
 	src, dst, err := validate(*srcFlag, *dstFlag)
 	if err != nil {
@@ -213,17 +429,22 @@ func main() {
 		}
 		defer logFile.Close()
 	}
+	o := &options{src: src, dst: dst, keep: *keep, incremental: *mode == "incremental",
+		excludes: excludes, verify: *verify, dryRun: *dryRun}
 
-	if *once {
-		runBackup(src, dst, *keep)
+	if *once || *dryRun {
+		if !runBackup(o) {
+			logFile.Close()
+			os.Exit(1)
+		}
 		return
 	}
 
 	logf("자동 백업 시작됨 (주기: %s)", *intervalFlag)
 	sig := make(chan os.Signal, 1)
-	signal.Notify(sig, os.Interrupt)
+	signal.Notify(sig, os.Interrupt, syscall.SIGTERM)
 	for {
-		runBackup(src, dst, *keep)
+		runBackup(o)
 		select {
 		case <-time.After(interval):
 		case <-sig:
