@@ -3,16 +3,15 @@ import customtkinter as ctk
 import tkinter as tk
 from tkinter import filedialog
 from tkinter import font as tkfont
-import shutil
 import os
 import datetime
 import queue
 import threading
 import time
 import sys
-import re
 import ctypes  # 윈도우 작업표시줄 아이콘 설정을 위해 필요
 
+import backup_core as core
 import design_tokens as dt
 
 SP = dt.SPACE
@@ -141,6 +140,7 @@ class Field(ctk.CTkEntry):
                          fg_color=C["field"], border_color=C["border"], text_color=C["text"],
                          placeholder_text_color=C["text_sub"])
         self._border = C["border"]
+        self._invalid, self._focused = False, False
         self.bind("<FocusIn>", lambda e: self._focus(True), add="+")
         self.bind("<FocusOut>", lambda e: self._focus(False), add="+")
 
@@ -148,14 +148,25 @@ class Field(ctk.CTkEntry):
         self._border = color
         self.configure(border_color=color)
 
+    def _rest_color(self):
+        return C["error" if self._invalid else "border"]
+
     def _focus(self, on):
+        self._focused = on
         self.configure(border_width=dt.FOCUS_BORDER if on else dt.BORDER)
-        animate(self, "border", self._paint, self._border, C["ring" if on else "border"])
+        animate(self, "border", self._paint, self._border, C["ring"] if on else self._rest_color())
+
+    def set_invalid(self, invalid):
+        """검증 실패를 컨트롤 자체에 표시한다 (테두리 색 + 문구는 폼 아래)."""
+        self._invalid = invalid
+        if not self._focused:
+            animate(self, "border", self._paint, self._border, self._rest_color())
 
     def set_enabled(self, enabled):
         if not enabled:  # 포커스 링 초기화
+            self._focused = False
             self.configure(border_width=dt.BORDER)
-            self._paint(C["border"])
+            self._paint(self._rest_color())
         self.configure(state="normal" if enabled else "disabled",
                        fg_color=C["field" if enabled else "off_surface"],
                        text_color=C["text" if enabled else "off_text"])
@@ -228,8 +239,11 @@ class ModernBackupApp(ctk.CTk):
         self.fonts = {role: ctk.CTkFont(family=family, size=px, weight=weight)
                       for role, (px, weight) in dt.TYPE.items()}
 
+        self.current_cancel = None  # 진행 중인 백업을 취소하는 이벤트
         self.ui_queue = queue.Queue()  # 백업 스레드 -> 메인 스레드 (tkinter는 스레드 안전하지 않다)
         self.build_layout()
+        for var in (self.source_dir, self.target_dir):
+            var.trace_add("write", lambda *a: self.clear_error())
         self.drain_ui_queue()
 
     # ---- layout ---------------------------------------------------------------------
@@ -351,6 +365,8 @@ class ModernBackupApp(ctk.CTk):
 
     def clear_error(self):
         self.error_label.configure(text="")
+        self.entry_src.set_invalid(False)
+        self.entry_dst.set_invalid(False)
 
     def set_busy(self, busy):
         if busy:  # 대기 중에는 진행 색을 트랙과 같게 해서 보이지 않게 한다
@@ -398,13 +414,12 @@ class ModernBackupApp(ctk.CTk):
             self.start_backup()
 
     def start_backup(self):
-        if not self.source_dir.get() or not self.target_dir.get():
-            self.show_error("원본 폴더와 저장 폴더를 모두 선택해주세요.")
-            return
-
-        error = self.validate_paths(self.source_dir.get(), self.target_dir.get())
-        if error:
-            self.show_error(error.replace("\n", " "))
+        problem = self.validate_paths(self.source_dir.get(), self.target_dir.get())
+        if problem:
+            fields, message = problem
+            self.show_error(message)
+            self.entry_src.set_invalid("source" in fields)
+            self.entry_dst.set_invalid("target" in fields)
             return
 
         self.clear_error()
@@ -423,22 +438,30 @@ class ModernBackupApp(ctk.CTk):
 
     @staticmethod
     def validate_paths(src, dst):
-        """폴더 존재 여부와, 저장 폴더가 원본 폴더 안에 있는 경우(무한 복사)를 검사합니다."""
+        """문제가 있으면 (문제의 입력 목록, 메시지), 없으면 None.
+        폴더 존재 여부와, 저장 폴더가 원본 폴더 안에 있는 경우(무한 복사)를 검사한다."""
+        if not src or not dst:
+            fields = {"source"} if not src else set()
+            if not dst:
+                fields.add("target")
+            return fields, "원본 폴더와 저장 폴더를 모두 선택해주세요."
         if not os.path.isdir(src):
-            return f"원본 폴더가 존재하지 않습니다:\n{src}"
+            return {"source"}, "원본 폴더가 존재하지 않습니다."
         if not os.path.isdir(dst):
-            return f"저장 폴더가 존재하지 않습니다:\n{dst}"
+            return {"target"}, "저장 폴더가 존재하지 않습니다."
         real_src, real_dst = os.path.realpath(src), os.path.realpath(dst)
         try:
             inside = os.path.commonpath([real_src, real_dst]) == real_src
         except ValueError:  # 서로 다른 드라이브
             inside = False
         if inside:
-            return "저장 폴더는 원본 폴더 안에 있을 수 없습니다.\n(백업이 자기 자신을 계속 복사하게 됩니다)"
+            return {"target"}, "저장 폴더는 원본 폴더 안에 있을 수 없습니다."
         return None
 
     def stop_backup(self):
         self.is_auto_running = False
+        if self.current_cancel is not None:
+            self.current_cancel.set()  # 진행 중인 복사도 중단한다
         
         self.set_input_state("normal")
 
@@ -468,68 +491,38 @@ class ModernBackupApp(ctk.CTk):
 
     def run_backup_process(self):
         # tkinter 변수/위젯은 메인 스레드에서만 읽는다: 값을 먼저 꺼내서 스레드에 넘긴다
-        job = (self.source_dir.get(), self.target_dir.get(), self.keep_map[self.option_keep.get()])
+        cancel = threading.Event()
+        self.current_cancel = cancel
+        job = (self.source_dir.get(), self.target_dir.get(), self.keep_map[self.option_keep.get()], cancel)
         threading.Thread(target=self._backup_task, args=job, daemon=True).start()
 
-    def _backup_task(self, src, dst, keep):
+    def _backup_task(self, src, dst, keep, cancel):
         if not self.backup_lock.acquire(blocking=False):
             self.post(lambda: self.log("이전 백업이 진행 중이라 건너뜁니다."))
             return
         self.post(self.set_busy, True)
         try:
-            self._do_backup(src, dst, keep)
+            self._do_backup(src, dst, keep, cancel)
         finally:
             self.backup_lock.release()
             self.post(self.set_busy, False)
 
-    def _prune_old_backups(self, dst, base, keep):
-        if keep <= 0:
-            return
-        pattern = re.compile(re.escape(base) + r"_\d{8}_\d{6}$")
-        names = sorted(n for n in os.listdir(dst)
-                       if pattern.fullmatch(n) and os.path.isdir(os.path.join(dst, n)))
-        for old in names[:-keep]:
-            try:
-                shutil.rmtree(os.path.join(dst, old))
-                self.post(lambda o=old: self.log(f"삭제: {o}"))
-            except Exception as e:
-                self.post(lambda o=old, err=e: self.log(f"삭제 실패: {o} ({err})"))
-
-    def _do_backup(self, src, dst, keep):
-        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-        target_path = os.path.join(dst, f"{os.path.basename(src)}_{timestamp}")
-
+    def _do_backup(self, src, dst, keep, cancel):
         try:
-            # 폴더 복사
-            shutil.copytree(src, target_path)
-
-            # 타겟 폴더 전체 용량 계산
-            total_size = 0
-            for dirpath, dirnames, filenames in os.walk(dst):
-                for f in filenames:
-                    fp = os.path.join(dirpath, f)
-                    try:
-                        total_size += os.path.getsize(fp)
-                    except Exception:
-                        pass
-
-            # 사람이 읽기 좋은 단위로 변환
-            def readable_size(size_bytes):
-                for unit in ['B','KB','MB','GB','TB']:
-                    if size_bytes < 1024:
-                        return f"{size_bytes:.1f} {unit}"
-                    size_bytes /= 1024
-                return f"{size_bytes:.1f} PB"
-
-            size_str = readable_size(total_size)
-
-            # 로그 출력
-            self.post(lambda: self.log(f"백업 완료: {os.path.basename(target_path)} (폴더 용량: {size_str})"))
-
-            self._prune_old_backups(dst, os.path.basename(src), keep)
-
+            name = core.run_backup(src, dst, cancel)
+        except core.Cancelled:
+            self.post(lambda: self.log("백업이 취소되어 건너뜁니다."))
+            return
         except Exception as e:
             self.post(lambda err=e: self.log(f"오류: {err}"))
+            return
+        size = core.readable_size(core.folder_size(dst))
+        self.post(lambda: self.log(f"백업 완료: {name} (폴더 용량: {size})"))
+        deleted, failed = core.prune(dst, os.path.basename(os.path.normpath(src)), keep)
+        for old in deleted:
+            self.post(lambda o=old: self.log(f"삭제: {o}"))
+        for old, err in failed:
+            self.post(lambda o=old, e=err: self.log(f"삭제 실패: {o} ({e})"))
 
 
 if __name__ == "__main__":

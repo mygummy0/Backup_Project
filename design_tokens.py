@@ -33,7 +33,7 @@ COLOR = {
 
 # ---- Semantic roles per theme (role -> palette name) -------------------------------------
 # The light/dark themes are designed as a pair: same roles, contrast checked independently.
-# Dark text is slate-50, not pure white; dark surfaces step page < card so cards stay visible.
+# Dark text is slate-200, not pure white (softer, per ant-design's dark-mode comfort principle); dark surfaces step page < card so cards stay visible.
 THEMES = {
     "light": {
         "page": "slate_50", "card": "white", "border": "slate_200", "field": "white", "log_bg": "slate_50",
@@ -47,7 +47,7 @@ THEMES = {
     },
     "dark": {
         "page": "slate_950", "card": "slate_900", "border": "slate_700", "field": "slate_950", "log_bg": "slate_950",
-        "text": "slate_50", "text_sub": "slate_400",
+        "text": "slate_200", "text_sub": "slate_400",
         "primary": "brand_600", "primary_hover": "brand_700", "primary_active": "brand_800", "on_primary": "white",
         "secondary": "slate_900", "secondary_hover": "slate_800", "secondary_active": "slate_700",
         "off_bg": "slate_800", "off_surface": "slate_800", "off_text": "slate_500",
